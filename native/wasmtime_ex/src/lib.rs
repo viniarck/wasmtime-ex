@@ -46,11 +46,18 @@ fn vec_to_terms<'a>(
 ) -> Result<Term<'a>, Error> {
     let mut results: Vec<Term> = Vec::new();
     for (i, v) in func_ty.iter().enumerate() {
-        // Ok((atoms::error(), e.to_string()).encode(env)),
         match v {
             ValType::I32 => results.push((values.get(i).unwrap().unwrap_i32()).encode(env)),
-            // TODO err out
-            _ => results.push((values.get(i).unwrap().unwrap_i32()).encode(env)),
+            ValType::I64 => results.push((values.get(i).unwrap().unwrap_i64()).encode(env)),
+            ValType::F32 => results.push((values.get(i).unwrap().unwrap_f32()).encode(env)),
+            ValType::F64 => results.push((values.get(i).unwrap().unwrap_f64()).encode(env)),
+            t => {
+                return Ok((
+                    atoms::error(),
+                    std::format!("ValType not supported yet: {:?}", t),
+                )
+                    .encode(env))
+            }
         };
     }
     Ok((atoms::ok(), results).encode(env))
@@ -93,20 +100,23 @@ fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     let params: Vec<rustler::Term> = args[2].decode()?;
 
     match MODULE_ENV.lock().unwrap().get(id) {
-        Some((module, engine)) => return {
-            let store = &Store::new(engine);
-            let fun: Extern = Func::new(
-                &store,
-                FuncType::new(Box::new([]), Box::new([])),
-                |_, params, results| {
-                    assert!(params.is_empty());
-                    assert!(results.is_empty());
-                    println!("called");
-                    Ok(())
-                },
-            ).into();
-            call(env, fn_name, store, module, params, &[fun])
-        },
+        Some((module, engine)) => {
+            return {
+                let store = &Store::new(engine);
+                // let fun: Extern = Func::new(
+                //     &store,
+                //     FuncType::new(Box::new([]), Box::new([])),
+                //     |_, params, results| {
+                //         assert!(params.is_empty());
+                //         assert!(results.is_empty());
+                //         println!("called");
+                //         Ok(())
+                //     },
+                // )
+                // .into();
+                call(env, fn_name, store, module, params, &[])
+            };
+        }
         None => {
             return Ok((
                 atoms::error(),
@@ -129,23 +139,36 @@ fn func_exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> 
                         ExternType::Func(t) => {
                             let mut params: Vec<Term> = Vec::new();
                             let mut results: Vec<Term> = Vec::new();
-
                             for v in t.params().iter() {
                                 match v {
                                     ValType::I32 => params.push((atoms::i32()).encode(env)),
-                                    // TODO err out
-                                    _ => params.push((atoms::i32()).encode(env)),
+                                    ValType::I64 => params.push((atoms::i64()).encode(env)),
+                                    ValType::F32 => params.push((atoms::f32()).encode(env)),
+                                    ValType::F64 => params.push((atoms::f32()).encode(env)),
+                                    t => {
+                                        return Ok((
+                                            atoms::error(),
+                                            std::format!("ValType not supported yet: {:?}", t),
+                                        )
+                                            .encode(env))
+                                    }
                                 };
                             }
-
                             for v in t.results().iter() {
                                 match v {
                                     ValType::I32 => results.push((atoms::i32()).encode(env)),
-                                    // TODO err out
-                                    _ => results.push((atoms::i32()).encode(env)),
+                                    ValType::I64 => results.push((atoms::i64()).encode(env)),
+                                    ValType::F32 => results.push((atoms::f32()).encode(env)),
+                                    ValType::F64 => results.push((atoms::f32()).encode(env)),
+                                    t => {
+                                        return Ok((
+                                            atoms::error(),
+                                            std::format!("ValType not supported yet: {:?}", t),
+                                        )
+                                            .encode(env))
+                                    }
                                 };
                             }
-
                             _exports.push((v.name(), params, results));
                         }
                         _ => (),
@@ -234,7 +257,22 @@ fn call<'a>(
                 let v: i64 = params[i].decode()?;
                 call_args.push(Val::I64(v));
             }
-            _ => (),
+            // # TODO add tests for floats
+            ValType::F32 => {
+                let v: u32 = params[i].decode()?;
+                call_args.push(Val::F32(v));
+            }
+            ValType::F64 => {
+                let v: u64 = params[i].decode()?;
+                call_args.push(Val::F64(v));
+            }
+            t => {
+                return Ok((
+                    atoms::error(),
+                    std::format!("ValType not supported yet: {:?}", t),
+                )
+                    .encode(env))
+            }
         };
     }
 
