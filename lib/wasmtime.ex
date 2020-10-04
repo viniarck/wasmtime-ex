@@ -3,6 +3,9 @@ defmodule Wasmtime do
   Documentation for `Wasmtime`.
   """
 
+  use GenServer
+  alias Wasmtime.Native
+
   defmodule FromBytes do
     @moduledoc """
     A struct representing a Wasm Instance from a bytes payload.
@@ -31,22 +34,6 @@ defmodule Wasmtime do
             file_path: String.t()
           }
   end
-
-  defmodule Native do
-    @moduledoc """
-    Documentation for `Wasmtime.Native.
-    """
-    use Rustler, otp_app: :wasmtime, crate: "wasmtime_ex"
-
-    def exports(_id), do: :erlang.nif_error(:nif_not_loaded)
-    def func_call(_id, _func, _params), do: :erlang.nif_error(:nif_not_loaded)
-    def func_exports(_id), do: :erlang.nif_error(:nif_not_loaded)
-    def load_from_file(_id, _file_name), do: :erlang.nif_error(:nif_not_loaded)
-    def load_from_bytes(_id, _bytes), do: :erlang.nif_error(:nif_not_loaded)
-
-  end
-
-  use GenServer
 
   @impl true
   def init(payload = %FromBytes{}) do
