@@ -19,6 +19,7 @@ mod atoms {
         atom global_type;
         atom table_type;
         atom memory_type;
+        atom call_back;
     }
 }
 
@@ -67,6 +68,7 @@ fn load_from_file<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error
     let id: &str = args[0].decode()?;
     let file_name: &str = args[1].decode()?;
     let store = Store::default();
+
     let module = match Module::from_file(store.engine(), file_name) {
         Ok(v) => v,
         Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
@@ -96,25 +98,21 @@ fn load_from_bytes<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Erro
 
 fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     let id: &str = args[0].decode()?;
-    let fn_name: &str = args[1].decode()?;
-    let params: Vec<rustler::Term> = args[2].decode()?;
+    let func_name: &str = args[1].decode()?;
+    let params: Vec<Term> = args[2].decode()?;
 
     match MODULE_ENV.lock().unwrap().get(id) {
         Some((module, engine)) => {
             return {
                 let store = &Store::new(engine);
-                // let fun: Extern = Func::new(
-                //     &store,
-                //     FuncType::new(Box::new([]), Box::new([])),
-                //     |_, params, results| {
-                //         assert!(params.is_empty());
-                //         assert!(results.is_empty());
-                //         println!("called");
-                //         Ok(())
-                //     },
-                // )
-                // .into();
-                call(env, fn_name, store, module, params, &[])
+                call(
+                    env,
+                    func_name,
+                    store,
+                    module,
+                    params,
+                    &[],
+                )
             };
         }
         None => {
@@ -224,7 +222,7 @@ fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
 
 fn call<'a>(
     env: Env<'a>,
-    fn_name: &str,
+    func_name: &str,
     store: &Store,
     module: &Module,
     params: Vec<Term>,
@@ -235,12 +233,12 @@ fn call<'a>(
         Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
     };
 
-    let func = match instance.get_func(fn_name) {
+    let func = match instance.get_func(func_name) {
         Some(v) => v,
         None => {
             return Ok((
                 atoms::error(),
-                format!("failed to find `{}` function export", fn_name),
+                format!("failed to find `{}` function export", func_name),
             )
                 .encode(env))
         }
