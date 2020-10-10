@@ -10,10 +10,15 @@ mod atoms {
     rustler::rustler_atoms! {
         atom ok;
         atom error;
+
         atom i32;
         atom i64;
         atom f32;
         atom f64;
+        atom v128;
+        atom extern_ref;
+        atom func_ref;
+
         atom func_type;
         atom global_type;
         atom table_type;
@@ -177,16 +182,9 @@ fn func_exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> 
                                             ValType::I64 => params.push((atoms::i64()).encode(env)),
                                             ValType::F32 => params.push((atoms::f32()).encode(env)),
                                             ValType::F64 => params.push((atoms::f32()).encode(env)),
-                                            t => {
-                                                return Ok((
-                                                    atoms::error(),
-                                                    std::format!(
-                                                        "ValType not supported yet: {:?}",
-                                                        t
-                                                    ),
-                                                )
-                                                    .encode(env))
-                                            }
+                                            ValType::V128 => params.push((atoms::v128()).encode(env)),
+                                            ValType::ExternRef => params.push((atoms::extern_ref()).encode(env)),
+                                            ValType::FuncRef => params.push((atoms::func_ref()).encode(env)),
                                         };
                                     }
                                     for v in t.results().iter() {
