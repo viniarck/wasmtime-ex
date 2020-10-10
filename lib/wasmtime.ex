@@ -5,35 +5,8 @@ defmodule Wasmtime do
 
   use GenServer
   alias Wasmtime.Native
-
-  defmodule FromBytes do
-    @moduledoc """
-    A struct representing a Wasm Instance from a bytes payload.
-    """
-
-    @enforce_keys [:bytes]
-    defstruct bytes: nil
-
-    @typedoc "An Instance from bytes"
-    @type t() :: %__MODULE__{
-            bytes: nonempty_charlist()
-          }
-  end
-
-  defmodule FromFile do
-    @moduledoc """
-    A struct representing a Wasm Instance from a file. Both .wasm and .wat
-    files can be interpreted by wasmtime.
-    """
-
-    @enforce_keys [:file_path]
-    defstruct file_path: nil
-
-    @typedoc "An Instance from file"
-    @type t() :: %__MODULE__{
-            file_path: String.t()
-          }
-  end
+  alias Wasmtime.FromBytes
+  alias Wasmtime.FromFile
 
   @impl true
   def init(payload = %FromBytes{}) do
@@ -77,6 +50,18 @@ defmodule Wasmtime do
   @impl true
   def handle_call({:func_exports}, _from, payload) do
     {:reply, Native.func_exports(payload.id |> Integer.to_string()), payload}
+  end
+
+  @impl true
+  def handle_info({:call_back, msg}, payload) do
+    IO.inspect("call_back #{msg}")
+
+    # TODO parametrize accordingly
+    # if length(payload.func_imports) == 1 do
+    #   IO.inspect(Enum.at(payload.func_imports, 0).())
+    # end
+
+    {:noreply, payload}
   end
 
   defp _load(payload) do
