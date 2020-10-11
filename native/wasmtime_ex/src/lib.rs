@@ -107,6 +107,14 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
         let mut _params: Vec<ValType> = Vec::new();
         let mut _results: Vec<ValType> = Vec::new();
 
+        if func_results.len() > 0 {
+            return Ok((
+                atoms::error(),
+                "func_imports: imported functions shouldn't return any result for now, please use []"
+            )
+                .encode(env));
+        }
+
         for _param in func_params {
             let value: rustler::Atom = _param.decode()?;
             let atom_value = match value {
@@ -125,23 +133,6 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
             _params.push(atom_value);
         }
 
-        for _result in func_results {
-            let value: rustler::Atom = _result.decode()?;
-            let atom_value = match value {
-                x if x == atoms::i32() => ValType::I32,
-                x if x == atoms::i64() => ValType::I64,
-                x if x == atoms::f32() => ValType::F32,
-                x if x == atoms::f64() => ValType::F32,
-                t => {
-                    return Ok((
-                        atoms::error(),
-                        std::format!("ValType not supported yet: {:?}", t),
-                    )
-                        .encode(env))
-                }
-            };
-            _results.push(atom_value);
-        }
         unsafe {
             match IMPORTS {
                 Some(ref mut v) => v.lock().unwrap().insert(func_id, env.pid()),
@@ -154,6 +145,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
                 }
             }
         };
+
         let fun: Extern = Func::new(
             &store,
             FuncType::new(_params.into_boxed_slice(), _results.into_boxed_slice()),
@@ -163,6 +155,8 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
                     match v {
                         Val::I32(k) => values.push(SendVal { v: Val::I32(*k) }),
                         Val::I64(k) => values.push(SendVal { v: Val::I64(*k) }),
+                        Val::F32(k) => values.push(SendVal { v: Val::F32(*k) }),
+                        Val::F64(k) => values.push(SendVal { v: Val::F64(*k) }),
                         _ => (),
                     }
                 }
