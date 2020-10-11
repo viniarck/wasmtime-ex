@@ -1,8 +1,10 @@
 // TODO
 // use rustler::schedule::SchedulerFlags;
-use rustler::{Encoder, Env, Error, Term};
+use rustler::{Encoder, Env, Error, OwnedEnv, Pid, Term};
+
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::thread;
 use wasmtime::Val;
 use wasmtime::*;
 
@@ -29,12 +31,18 @@ mod atoms {
 
 // Instance couldn't be bootstraped with lazy_static! for not implementing Send
 static mut INSTANCES: Option<Mutex<HashMap<&'static str, Instance>>> = None;
+static mut IMPORTS: Option<Mutex<HashMap<u64, Pid>>> = None;
+
+struct SendVal {
+    v: Val,
+}
+
+unsafe impl Send for SendVal {}
 
 rustler::rustler_export_nifs! {
     "Elixir.Wasmtime.Native",
     [
-        ("load_from_file", 2, load_from_file),
-        ("load_from_bytes", 2, load_from_bytes),
+        ("load_from", 4, load_from),
         ("exports", 1, exports),
         ("func_call", 3, func_call),
         ("func_exports", 1, func_exports),
@@ -45,6 +53,7 @@ rustler::rustler_export_nifs! {
 fn on_load(_env: Env, _term: Term) -> bool {
     unsafe {
         INSTANCES = Some(Mutex::new(HashMap::new()));
+        IMPORTS = Some(Mutex::new(HashMap::new()));
     }
     true
 }
@@ -73,16 +82,132 @@ fn vec_to_terms<'a>(
     Ok((atoms::ok(), results).encode(env))
 }
 
-fn load_from_file<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
+fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     let id: &str = args[0].decode()?;
     let file_name: &str = args[1].decode()?;
+    let bin: Vec<u8> = args[2].decode()?;
+    let array: &[u8] = &bin;
+    let func_imports: Vec<(u64, Vec<Term>, Vec<Term>)> = args[3].decode()?;
+    let mut _func_imports: Vec<Extern> = Vec::new();
     let store = Store::default();
 
-    let module = match Module::from_file(store.engine(), file_name) {
-        Ok(v) => v,
-        Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+    let module = if !file_name.is_empty() {
+        match Module::from_file(store.engine(), file_name) {
+            Ok(v) => v,
+            Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+        }
+    } else {
+        match Module::from_binary(store.engine(), array) {
+            Ok(v) => v,
+            Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+        }
     };
-    let instance = match Instance::new(&store, &module, &[]) {
+
+    for (func_id, func_params, func_results) in func_imports {
+        let mut _params: Vec<ValType> = Vec::new();
+        let mut _results: Vec<ValType> = Vec::new();
+
+        for _param in func_params {
+            let value: rustler::Atom = _param.decode()?;
+            let atom_value = match value {
+                x if x == atoms::i32() => ValType::I32,
+                x if x == atoms::i64() => ValType::I64,
+                x if x == atoms::f32() => ValType::F32,
+                x if x == atoms::f64() => ValType::F32,
+                t => {
+                    return Ok((
+                        atoms::error(),
+                        std::format!("ValType not supported yet: {:?}", t),
+                    )
+                        .encode(env))
+                }
+            };
+            _params.push(atom_value);
+        }
+
+        for _result in func_results {
+            let value: rustler::Atom = _result.decode()?;
+            let atom_value = match value {
+                x if x == atoms::i32() => ValType::I32,
+                x if x == atoms::i64() => ValType::I64,
+                x if x == atoms::f32() => ValType::F32,
+                x if x == atoms::f64() => ValType::F32,
+                t => {
+                    return Ok((
+                        atoms::error(),
+                        std::format!("ValType not supported yet: {:?}", t),
+                    )
+                        .encode(env))
+                }
+            };
+            _results.push(atom_value);
+        }
+        unsafe {
+            match IMPORTS {
+                Some(ref mut v) => v.lock().unwrap().insert(func_id, env.pid()),
+                None => {
+                    return Ok((
+                        atoms::error(),
+                        "IMPORTS didn't initialize properly on_load. Please, file an issue.",
+                    )
+                        .encode(env))
+                }
+            }
+        };
+        let fun: Extern = Func::new(
+            &store,
+            FuncType::new(_params.into_boxed_slice(), _results.into_boxed_slice()),
+            move |_, params, _| {
+                let mut values: Vec<SendVal> = Vec::new();
+                for v in params.iter() {
+                    match v {
+                        Val::I32(k) => values.push(SendVal { v: Val::I32(*k) }),
+                        Val::I64(k) => values.push(SendVal { v: Val::I64(*k) }),
+                        _ => (),
+                    }
+                }
+                unsafe {
+                    thread::spawn(move || {
+                        match IMPORTS {
+                            Some(ref mut v) => match v.lock().unwrap().get(&func_id) {
+                                Some(pid) => {
+                                    let mut msg_env = OwnedEnv::new();
+                                    msg_env.send_and_clear(pid, |env| match values.len() {
+                                        x if x == 0 => (atoms::call_back(), func_id).encode(env),
+                                        x if x == 1 => {
+                                            let param = match values.get(0) {
+                                                Some(v) => match v.v.ty() {
+                                                    ValType::I32 => v.v.unwrap_i32().encode(env),
+                                                    ValType::I64 => v.v.unwrap_i64().encode(env),
+                                                    ValType::F32 => v.v.unwrap_f32().encode(env),
+                                                    ValType::F64 => v.v.unwrap_f64().encode(env),
+                                                    t => {
+                                                        format!("Unsuported type {}", t).encode(env)
+                                                    }
+                                                },
+                                                None => format!("Unsuported. None").encode(env),
+                                            };
+                                            (atoms::call_back(), func_id, param).encode(env)
+                                        }
+                                        // TODO extract
+                                        // x if x == 2 => (),
+                                        // TODO send err
+                                        _ => (atoms::call_back(), func_id).encode(env),
+                                    });
+                                }
+                                None => (),
+                            },
+                            None => (),
+                        };
+                    });
+                }
+                Ok(())
+            },
+        )
+        .into();
+        _func_imports.push(fun);
+    }
+    let instance = match Instance::new(&store, &module, &*_func_imports.into_boxed_slice()) {
         Ok(v) => v,
         Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
     };
@@ -96,37 +221,6 @@ fn load_from_file<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error
                 return Ok((
                     atoms::error(),
                     "INSTANCES didn't initialize properly on_load. Please, file an issue.",
-                )
-                    .encode(env))
-            }
-        }
-    };
-    Ok((atoms::ok()).encode(env))
-}
-
-fn load_from_bytes<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
-    let id: &str = args[0].decode()?;
-    let bin: Vec<u8> = args[1].decode()?;
-    let array: &[u8] = &bin;
-    let store = Store::default();
-    let module = match Module::from_binary(store.engine(), array) {
-        Ok(v) => v,
-        Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
-    };
-    let instance = match Instance::new(&store, &module, &[]) {
-        Ok(v) => v,
-        Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
-    };
-    unsafe {
-        match INSTANCES {
-            Some(ref mut v) => v
-                .lock()
-                .unwrap()
-                .insert(Box::leak(id.clone().to_owned().into_boxed_str()), instance),
-            None => {
-                return Ok((
-                    atoms::error(),
-                    "INSTANCES didn't initialized properly on_load. Please, file an issue.",
                 )
                     .encode(env))
             }
@@ -182,9 +276,15 @@ fn func_exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> 
                                             ValType::I64 => params.push((atoms::i64()).encode(env)),
                                             ValType::F32 => params.push((atoms::f32()).encode(env)),
                                             ValType::F64 => params.push((atoms::f32()).encode(env)),
-                                            ValType::V128 => params.push((atoms::v128()).encode(env)),
-                                            ValType::ExternRef => params.push((atoms::extern_ref()).encode(env)),
-                                            ValType::FuncRef => params.push((atoms::func_ref()).encode(env)),
+                                            ValType::V128 => {
+                                                params.push((atoms::v128()).encode(env))
+                                            }
+                                            ValType::ExternRef => {
+                                                params.push((atoms::extern_ref()).encode(env))
+                                            }
+                                            ValType::FuncRef => {
+                                                params.push((atoms::func_ref()).encode(env))
+                                            }
                                         };
                                     }
                                     for v in t.results().iter() {
