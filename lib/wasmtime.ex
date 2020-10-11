@@ -10,12 +10,24 @@ defmodule Wasmtime do
 
   @impl true
   def init(payload = %FromBytes{}) do
-    {:ok, Map.put(payload, :id, System.unique_integer([:monotonic]))}
+    {:ok, payload |> init_payload}
   end
 
   @impl true
   def init(payload = %FromFile{}) do
-    {:ok, Map.put(payload, :id, System.unique_integer([:monotonic]))}
+    {:ok, payload |> init_payload}
+  end
+
+  defp init_payload(payload) do
+    payload = Map.put(payload, :id, System.unique_integer([:monotonic]))
+
+    Map.put(
+      payload,
+      :imports,
+      Enum.reduce(payload.func_imports, %{}, fn x, acc ->
+        Map.put(acc, System.unique_integer([:positive]), {elem(x, 0), elem(x, 1), elem(x, 2)})
+      end)
+    )
   end
 
   @impl true
@@ -23,17 +35,13 @@ defmodule Wasmtime do
     {:reply, Native.func_call(payload.id |> Integer.to_string(), fn_name, params), payload}
   end
 
-  def func_imports_to_term(func_imports) do
-    case length(func_imports) do
-      0 ->
-        []
+  defp func_imports_to_term(payload) do
+    imps = Map.get(payload, :imports)
 
-      _ ->
-        [
-          {System.unique_integer([:positive]), func_imports |> hd |> elem(1),
-           func_imports |> hd |> elem(2)}
-        ]
-    end
+    Enum.reduce(Map.keys(imps), [], fn x, acc ->
+      [{x, Map.get(imps, x) |> elem(1), Map.get(imps, x) |> elem(2)} | acc]
+    end)
+    |> Enum.reverse()
   end
 
   @impl true
@@ -45,7 +53,7 @@ defmodule Wasmtime do
            payload.id |> Integer.to_string(),
            "",
            payload.bytes |> :binary.bin_to_list(),
-           payload.func_imports |> func_imports_to_term
+           payload |> func_imports_to_term
          ), payload}
 
       payload = %FromFile{} ->
@@ -54,7 +62,7 @@ defmodule Wasmtime do
            payload.id |> Integer.to_string(),
            payload.file_path,
            [],
-           payload.func_imports |> func_imports_to_term
+           payload |> func_imports_to_term
          ), payload}
     end
   end
