@@ -77,28 +77,11 @@ defmodule Wasmtime do
     {:reply, Native.func_exports(payload.id |> Integer.to_string()), payload}
   end
 
-  @impl true
-  def handle_info({:call_back, id, param}, payload) do
-    IO.inspect("call_back #{id} #{param}")
-
-    # TODO parametrize accordingly
-    # if length(payload.func_imports) == 1 do
-    #   IO.inspect(Enum.at(payload.func_imports, 0).())
-    # end
-
-    {:noreply, payload}
-  end
-
-  @impl true
-  def handle_info({:call_back, id, param, param2}, payload) do
-    IO.inspect("call_back2 #{id} #{param} #{param2}")
-
-    # TODO parametrize accordingly
-    # if length(payload.func_imports) == 1 do
-    #   IO.inspect(Enum.at(payload.func_imports, 0).())
-    # end
-
-    {:noreply, payload}
+  defp invoke_import(payload, id, params) do
+    Map.get(payload, :imports)
+    |> Map.get(id)
+    |> elem(0)
+    |> apply(params)
   end
 
   defp _load(payload) do
@@ -130,4 +113,35 @@ defmodule Wasmtime do
   def func_exports(pid) when is_pid(pid) do
     GenServer.call(pid, {:func_exports})
   end
+
+  @impl true
+  def handle_info({:call_back, id, param0}, payload) do
+    invoke_import(payload, id, [param0])
+    {:noreply, payload}
+  end
+
+  @impl true
+  def handle_info({:call_back, id, param0, param1}, payload) do
+    invoke_import(payload, id, [param0, param1])
+    {:noreply, payload}
+  end
+
+  @impl true
+  def handle_info({:call_back, id, param0, param1, param2}, payload) do
+    invoke_import(payload, id, [param0, param1, param2])
+    {:noreply, payload}
+  end
+
+  @impl true
+  def handle_info({:call_back, id, param0, param1, param2, param3}, payload) do
+    invoke_import(payload, id, [param0, param1, param2, param3])
+    {:noreply, payload}
+  end
+
+  @impl true
+  def handle_info({:call_back, id, param0, param1, param2, param3, param4}, payload) do
+    invoke_import(payload, id, [param0, param1, param2, param3, param4])
+    {:noreply, payload}
+  end
+
 end
