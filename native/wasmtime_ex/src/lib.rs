@@ -33,11 +33,11 @@ mod atoms {
 static mut INSTANCES: Option<Mutex<HashMap<&'static str, Instance>>> = None;
 static mut IMPORTS: Option<Mutex<HashMap<u64, Pid>>> = None;
 
-struct SendVal {
+struct SVal {
     v: Val,
 }
 
-unsafe impl Send for SendVal {}
+unsafe impl Send for SVal {}
 
 rustler::rustler_export_nifs! {
     "Elixir.Wasmtime.Native",
@@ -150,13 +150,13 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
             &store,
             FuncType::new(_params.into_boxed_slice(), _results.into_boxed_slice()),
             move |_, params, _| {
-                let mut values: Vec<SendVal> = Vec::new();
+                let mut values: Vec<SVal> = Vec::new();
                 for v in params.iter() {
                     match v {
-                        Val::I32(k) => values.push(SendVal { v: Val::I32(*k) }),
-                        Val::I64(k) => values.push(SendVal { v: Val::I64(*k) }),
-                        Val::F32(k) => values.push(SendVal { v: Val::F32(*k) }),
-                        Val::F64(k) => values.push(SendVal { v: Val::F64(*k) }),
+                        Val::I32(k) => values.push(SVal { v: Val::I32(*k) }),
+                        Val::I64(k) => values.push(SVal { v: Val::I64(*k) }),
+                        Val::F32(k) => values.push(SVal { v: Val::F32(*k) }),
+                        Val::F64(k) => values.push(SVal { v: Val::F64(*k) }),
                         _ => (),
                     }
                 }
@@ -164,31 +164,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
                     thread::spawn(move || {
                         match IMPORTS {
                             Some(ref mut v) => match v.lock().unwrap().get(&func_id) {
-                                Some(pid) => {
-                                    let mut msg_env = OwnedEnv::new();
-                                    msg_env.send_and_clear(pid, |env| match values.len() {
-                                        x if x == 0 => (atoms::call_back(), func_id).encode(env),
-                                        x if x == 1 => {
-                                            let param = match values.get(0) {
-                                                Some(v) => match v.v.ty() {
-                                                    ValType::I32 => v.v.unwrap_i32().encode(env),
-                                                    ValType::I64 => v.v.unwrap_i64().encode(env),
-                                                    ValType::F32 => v.v.unwrap_f32().encode(env),
-                                                    ValType::F64 => v.v.unwrap_f64().encode(env),
-                                                    t => {
-                                                        format!("Unsuported type {}", t).encode(env)
-                                                    }
-                                                },
-                                                None => format!("Unsuported. None").encode(env),
-                                            };
-                                            (atoms::call_back(), func_id, param).encode(env)
-                                        }
-                                        // TODO extract
-                                        // x if x == 2 => (),
-                                        // TODO send err
-                                        _ => (atoms::call_back(), func_id).encode(env),
-                                    });
-                                }
+                                Some(pid) => send_and_clear(func_id, pid, &values),
                                 None => (),
                             },
                             None => (),
@@ -432,4 +408,63 @@ fn call<'a>(
     };
 
     vec_to_terms(env, res.into_vec(), func.ty().results())
+}
+
+fn sval_to_term<'a>(env: Env<'a>, send_val: &SVal) -> Term<'a> {
+    match send_val.v.ty() {
+        ValType::I32 => send_val.v.unwrap_i32().encode(env),
+        ValType::I64 => send_val.v.unwrap_i64().encode(env),
+        ValType::F32 => send_val.v.unwrap_f32().encode(env),
+        ValType::F64 => send_val.v.unwrap_f64().encode(env),
+        t => format!("Unsuported type {}", t).encode(env),
+    }
+}
+
+fn send_and_clear(func_id: u64, pid: &Pid, values: &Vec<SVal>) {
+    let mut msg_env = OwnedEnv::new();
+    msg_env.send_and_clear(pid, |env| match values.len() {
+        x if x == 0 => (atoms::call_back(), func_id).encode(env),
+        x if x == 1 => (
+            atoms::call_back(),
+            func_id,
+            sval_to_term(env, values.get(0).unwrap()),
+        )
+            .encode(env),
+        x if x == 2 => (
+            atoms::call_back(),
+            func_id,
+            sval_to_term(env, values.get(0).unwrap()),
+            sval_to_term(env, values.get(1).unwrap()),
+        )
+            .encode(env),
+        x if x == 3 => (
+            atoms::call_back(),
+            func_id,
+            sval_to_term(env, values.get(0).unwrap()),
+            sval_to_term(env, values.get(1).unwrap()),
+            sval_to_term(env, values.get(2).unwrap()),
+        )
+            .encode(env),
+        x if x == 4 => (
+            atoms::call_back(),
+            func_id,
+            sval_to_term(env, values.get(0).unwrap()),
+            sval_to_term(env, values.get(1).unwrap()),
+            sval_to_term(env, values.get(2).unwrap()),
+            sval_to_term(env, values.get(3).unwrap()),
+        )
+            .encode(env),
+        x if x == 5 => (
+            atoms::call_back(),
+            func_id,
+            sval_to_term(env, values.get(0).unwrap()),
+            sval_to_term(env, values.get(1).unwrap()),
+            sval_to_term(env, values.get(2).unwrap()),
+            sval_to_term(env, values.get(3).unwrap()),
+            sval_to_term(env, values.get(4).unwrap()),
+        )
+            .encode(env),
+        // TODO send err
+        _ => (atoms::call_back(), func_id).encode(env),
+    });
 }
