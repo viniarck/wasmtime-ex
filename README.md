@@ -1,11 +1,12 @@
-# Wasmtime
+# wasmtime-ex
+
+![logo](https://lh3.googleusercontent.com/pw/ACtC-3cxbQiBP8tra3bdyBk0A1gqo8Ui5rVS-4sVjMdHRRaQxSphTH9FxIuP-O29EV4Vb0aAUvdsXv1gEX6PF5xGOBmCy4YWtt9WBVTS6YOsbeKCOJyU5HZh9kXC7thVEJDZYKN2j_ncTFcp-WvYtuLJQK87=w500-h300-no?authuser=0)
 
 Elixir WebAssembly runtime powered by Wasmtime
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `wasmtime` to your list of dependencies in `mix.exs`:
+You can add `wasmtime` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -15,7 +16,7 @@ def deps do
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/wasmtime](https://hexdocs.pm/wasmtime).
+## Docs
+
+[https://hexdocs.pm/wasmtime](https://hexdocs.pm/wasmtime).
 
