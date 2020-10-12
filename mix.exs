@@ -15,6 +15,7 @@ defmodule Wasmtime.MixProject do
       ],
       name: "Wasmtime",
       description: "Elixir WebAssembly runtime powered by Wasmtime",
+      package: package(),
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
@@ -39,6 +40,16 @@ defmodule Wasmtime.MixProject do
       {:rustler, "~> 0.21.1"},
       {:excoveralls, "~> 0.13.2", only: :test},
       {:benchee, "~> 1.0", only: :dev}
+    ]
+  end
+
+  defp package() do
+    [
+      files:
+        ~w(lib native/wasmtime_ex/src native/wasmtime_ex/Cargo* native/wasmtime_ex/.cargo .formatter.exs mix.exs README* LICENSE*
+                ),
+      licenses: ["Apache-2.0"],
+      links: %{"GitHub" => "https://github.com/viniarck/wasmtime-ex"}
     ]
   end
 end
