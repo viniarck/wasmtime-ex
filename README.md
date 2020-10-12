@@ -16,6 +16,8 @@ def deps do
 end
 ```
 
+This package is still under heavy development, I'd recommend you to wait for the `0.2.0` release since the core API might still change, feel free to explore it in the meantime. Enjoy!
+
 ## Docs
 
 [https://hexdocs.pm/wasmtime](https://hexdocs.pm/wasmtime).
