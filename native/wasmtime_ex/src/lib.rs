@@ -91,13 +91,13 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     let mut _func_imports: Vec<Extern> = Vec::new();
     let store = Store::default();
 
-    let module = if !file_name.is_empty() {
-        match Module::from_file(store.engine(), file_name) {
+    let module = if bin.len() > 0 {
+        match Module::new(store.engine(), array) {
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         }
     } else {
-        match Module::from_binary(store.engine(), array) {
+        match Module::from_file(store.engine(), file_name) {
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         }
