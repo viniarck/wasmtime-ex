@@ -30,7 +30,7 @@ mod atoms {
 }
 
 // Instance couldn't be bootstraped with lazy_static! for not implementing Send
-static mut INSTANCES: Option<Mutex<HashMap<&'static str, Instance>>> = None;
+static mut INSTANCES: Option<Mutex<HashMap<u64, Instance>>> = None;
 static mut IMPORTS: Option<Mutex<HashMap<u64, Pid>>> = None;
 
 struct SVal {
@@ -83,7 +83,7 @@ fn vec_to_terms<'a>(
 }
 
 fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
-    let id: &str = args[0].decode()?;
+    let id: u64 = args[0].decode()?;
     let file_name: &str = args[1].decode()?;
     let bin: Vec<u8> = args[2].decode()?;
     let array: &[u8] = &bin;
@@ -186,7 +186,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
             Some(ref mut v) => v
                 .lock()
                 .unwrap()
-                .insert(Box::leak(id.clone().to_owned().into_boxed_str()), instance),
+                .insert(id, instance),
             None => {
                 return Ok((
                     atoms::error(),
@@ -200,13 +200,13 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
 }
 
 fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
-    let id: &str = args[0].decode()?;
+    let id: u64 = args[0].decode()?;
     let func_name: &str = args[1].decode()?;
     let params: Vec<Term> = args[2].decode()?;
 
     unsafe {
         match INSTANCES {
-            Some(ref mut v) => match v.lock().unwrap().get(id) {
+            Some(ref mut v) => match v.lock().unwrap().get(&id) {
                 Some(inst) => return call(env, inst, func_name, params),
                 None => {
                     return Ok((
@@ -228,10 +228,10 @@ fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
 }
 
 fn func_exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
-    let id: &str = args[0].decode()?;
+    let id: u64 = args[0].decode()?;
     unsafe {
         match INSTANCES {
-            Some(ref mut v) => match v.lock().unwrap().get(id) {
+            Some(ref mut v) => match v.lock().unwrap().get(&id) {
                 Some(inst) => {
                     return {
                         let mut _exports: Vec<(&str, Vec<Term>, Vec<Term>)> = Vec::new();
@@ -311,11 +311,11 @@ fn func_exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> 
 }
 
 fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
-    let id: &str = args[0].decode()?;
+    let id: u64 = args[0].decode()?;
 
     unsafe {
         match INSTANCES {
-            Some(ref mut v) => match v.lock().unwrap().get(id) {
+            Some(ref mut v) => match v.lock().unwrap().get(&id) {
                 Some(inst) => {
                     let mut _exports: Vec<(&str, Term)> = Vec::new();
                     for v in inst.exports() {

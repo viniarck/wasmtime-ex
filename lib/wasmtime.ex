@@ -19,7 +19,7 @@ defmodule Wasmtime do
   end
 
   defp init_payload(payload) do
-    payload = Map.put(payload, :id, System.unique_integer([:monotonic]))
+    payload = Map.put(payload, :id, System.unique_integer([:positive]))
 
     Map.put(
       payload,
@@ -32,7 +32,7 @@ defmodule Wasmtime do
 
   @impl true
   def handle_call({:func_call, fn_name, params}, _from, payload) do
-    {:reply, Native.func_call(payload.id |> Integer.to_string(), fn_name, params), payload}
+    {:reply, Native.func_call(payload.id, fn_name, params), payload}
   end
 
   defp func_imports_to_term(payload) do
@@ -50,7 +50,7 @@ defmodule Wasmtime do
       payload = %FromBytes{} ->
         {:reply,
          Native.load_from(
-           payload.id |> Integer.to_string(),
+           payload.id,
            "",
            payload.bytes |> :binary.bin_to_list(),
            payload |> func_imports_to_term
@@ -59,7 +59,7 @@ defmodule Wasmtime do
       payload = %FromFile{} ->
         {:reply,
          Native.load_from(
-           payload.id |> Integer.to_string(),
+           payload.id,
            payload.file_path,
            [],
            payload |> func_imports_to_term
@@ -69,12 +69,12 @@ defmodule Wasmtime do
 
   @impl true
   def handle_call({:exports}, _from, payload) do
-    {:reply, Native.exports(payload.id |> Integer.to_string()), payload}
+    {:reply, Native.exports(payload.id), payload}
   end
 
   @impl true
   def handle_call({:func_exports}, _from, payload) do
-    {:reply, Native.func_exports(payload.id |> Integer.to_string()), payload}
+    {:reply, Native.func_exports(payload.id), payload}
   end
 
   defp invoke_import(payload, id, params) do
@@ -143,5 +143,4 @@ defmodule Wasmtime do
     invoke_import(payload, id, [param0, param1, param2, param3, param4])
     {:noreply, payload}
   end
-
 end
