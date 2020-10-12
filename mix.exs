@@ -15,7 +15,14 @@ defmodule Wasmtime.MixProject do
       ],
       name: "Wasmtime",
       description: "Elixir WebAssembly runtime powered by Wasmtime",
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test
+      ]
     ]
   end
 
@@ -30,6 +37,7 @@ defmodule Wasmtime.MixProject do
   defp deps do
     [
       {:rustler, "~> 0.21.1"},
+      {:excoveralls, "~> 0.13.2", only: :test},
       {:benchee, "~> 1.0", only: :dev}
     ]
   end
