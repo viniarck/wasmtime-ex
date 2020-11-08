@@ -237,7 +237,13 @@ fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerE
                     // TODO continue here hook it up with call..
                     // TODO get func_id from call resp
                     println!("t calling");
-                    let call_res = match call(env, &instance, "run", Vec::new()) {
+                    let mut params: Vec<Term> = Vec::new();
+                    let res = val.unwrap();
+                    let f_name = res.0;
+                    for sval in res.1 {
+                       params.push(sval_to_term(env, &sval));
+                    }
+                    let call_res = match call(env, &instance, &f_name, params) {
                         Ok(v) => v,
                         Err(e) => atoms::error().encode(env),
                     };
@@ -247,8 +253,6 @@ fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerE
                     let mut res: Vec<i32> = Vec::new();
                     // res.push(2);
                     // res.push(2);
-                    // TODO consider :erlang binary to term instead? drop env?
-                    // (atoms::call_back(), func_id, call_res).encode(env)
                     (atoms::call_back_res(), func_id, call_res).encode(env)
                 });
 
