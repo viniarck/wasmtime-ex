@@ -16,17 +16,12 @@ use std::thread;
 use wasmtime::Val;
 use wasmtime::*;
 use crate::session::Session;
+use crate::session::SVal;
 
 
 lazy_static! {
     static ref SESS: Mutex<HashMap<u64, Box<Session>>> = Mutex::new(HashMap::new());
 }
-
-struct SVal {
-    v: Val,
-}
-
-unsafe impl Send for SVal {}
 
 rustler::rustler_export_nifs! {
     "Elixir.Wasmtime.Native",
@@ -201,7 +196,7 @@ fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerE
             };
             // let fn_imports2 = fn_imports.clone();
 
-            let tch: (crossbeam::Sender<i64>, crossbeam::Receiver<i64>) = unbounded();
+            let tch: (crossbeam::Sender<(String, Vec<SVal>)>, crossbeam::Receiver<(String, Vec<SVal>)>) = unbounded();
             let fch: (crossbeam::Sender<i64>, crossbeam::Receiver<i64>) = unbounded();
             let func_id = fn_imports.get(0).unwrap().0;
             let func_imports = imports_valtype_to_extern(
@@ -294,7 +289,8 @@ fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     };
 
     // TODO func call exec command...
-    SESS.lock().unwrap().get(&tid).unwrap().tch.0.send(42);
+    let mut call_args: Vec<SVal> = Vec::new();
+    SESS.lock().unwrap().get(&tid).unwrap().tch.0.send(("run".to_string(), call_args));
     // let store = Store::new(SESS.lock().unwrap().get(&tid).unwrap().module.engine());
     // let fn_imports = imports_valtype_to_extern(fn_imports, &store, &gen_pid, &from_encoded);
     // let instance = match Instance::new(
