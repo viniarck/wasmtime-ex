@@ -31,8 +31,17 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_call({:func_call, fn_name, params}, _from, payload) do
-    {:reply, Native.func_call(payload.id, fn_name, params), payload}
+  def handle_call({:func_call, fn_name, params}, from, payload) do
+    # TODO switch to no reply... i'll have to pass the gen_pid and from serd...
+    {:reply,
+     Native.func_call(
+       payload.id,
+       self(),
+       from |> pidref_encode,
+       fn_name,
+       params,
+       payload |> func_imports_to_term
+     ), payload}
   end
 
   defp func_imports_to_term(payload) do
@@ -42,6 +51,45 @@ defmodule Wasmtime do
       [{x, Map.get(imps, x) |> elem(1), Map.get(imps, x) |> elem(2)} | acc]
     end)
     |> Enum.reverse()
+  end
+
+  defp pidref_encode(pid_ref) do
+    pid_ref |> :erlang.term_to_binary() |> Base.encode64()
+  end
+
+  defp pidref_decode(hex) do
+    hex |> Base.decode64!() |> :erlang.binary_to_term()
+  end
+
+  @impl true
+  def handle_call({:load_from_t}, from, payload) do
+    # TODO continue here..
+    # payload = Map.put(payload, :from, from)
+    payload = Map.put(payload, from |> pidref_encode, from)
+
+    case payload do
+      payload = %FromBytes{} ->
+        Native.load_from_t(
+          payload.id,
+          self(),
+          from |> pidref_encode(),
+          "",
+          payload.bytes |> :binary.bin_to_list(),
+          payload |> func_imports_to_term
+        )
+
+      payload = %FromFile{} ->
+        Native.load_from_t(
+          payload.id,
+          self(),
+          from |> pidref_encode(),
+          payload.file_path,
+          [],
+          payload |> func_imports_to_term
+        )
+    end
+
+    {:noreply, payload}
   end
 
   @impl true
@@ -87,7 +135,7 @@ defmodule Wasmtime do
   defp _load(payload) do
     {:ok, pid} = GenServer.start_link(__MODULE__, payload)
 
-    case GenServer.call(pid, {:load}) do
+    case GenServer.call(pid, {:load_from_t}) do
       :ok -> {:ok, pid}
       {:error, msg} -> {:error, msg}
     end
@@ -115,32 +163,32 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_info({:call_back, id, param0}, payload) do
-    invoke_import(payload, id, [param0])
+  def handle_info({:call_back_res, id, params}, payload) do
+    IO.inspect("call_back_res")
+    IO.inspect(id)
+    IO.inspect(params)
     {:noreply, payload}
   end
 
   @impl true
-  def handle_info({:call_back, id, param0, param1}, payload) do
-    invoke_import(payload, id, [param0, param1])
+  def handle_info({:call_back, id, params}, payload) do
+    IO.inspect("call_back")
+    IO.inspect(id)
+    IO.inspect(params)
+    res = invoke_import(payload, id, params)
+    # TODO should've been func.id in the future.. refactor
+    Native.call_back_reply(payload.id, res)
     {:noreply, payload}
   end
 
   @impl true
-  def handle_info({:call_back, id, param0, param1, param2}, payload) do
-    invoke_import(payload, id, [param0, param1, param2])
-    {:noreply, payload}
-  end
-
-  @impl true
-  def handle_info({:call_back, id, param0, param1, param2, param3}, payload) do
-    invoke_import(payload, id, [param0, param1, param2, param3])
-    {:noreply, payload}
-  end
-
-  @impl true
-  def handle_info({:call_back, id, param0, param1, param2, param3, param4}, payload) do
-    invoke_import(payload, id, [param0, param1, param2, param3, param4])
+  def handle_info({:t_ctl, from, msg}, payload) do
+    IO.inspect("handling t_ctl #{msg}")
+    GenServer.reply(Map.get(payload, from), msg)
+    # case msg do
+    #   :ok -> IO.inspect("ok baby")
+    #   {:error, msg} -> IO.inspect("error #{msg}")
+    # end
     {:noreply, payload}
   end
 end
