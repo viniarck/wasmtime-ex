@@ -1,4 +1,4 @@
-use wasmtime::*;
+use wasmtime::{Module, ValType};
 
 pub struct Session {
     pub module: Module,
