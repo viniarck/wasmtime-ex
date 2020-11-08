@@ -117,12 +117,12 @@ defmodule Wasmtime do
 
   @impl true
   def handle_call({:exports}, _from, payload) do
-    {:reply, Native.exports(payload.id), payload}
+    {:reply, Native.exports(payload.id, payload |> func_imports_to_term), payload}
   end
 
   @impl true
   def handle_call({:func_exports}, _from, payload) do
-    {:reply, Native.func_exports(payload.id), payload}
+    {:reply, Native.func_exports(payload.id, payload |> func_imports_to_term), payload}
   end
 
   defp invoke_import(payload, id, params) do
