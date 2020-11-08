@@ -31,7 +31,7 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_call({:func_call, fn_name, params}, from, payload) do
+  def handle_call({:func_call, fn_name, params_ty}, from, payload) do
     # TODO switch to no reply... i'll have to pass the gen_pid and from serd...
     {:reply,
      Native.func_call(
@@ -39,7 +39,7 @@ defmodule Wasmtime do
        self(),
        from |> pidref_encode,
        fn_name,
-       params,
+       params_ty,
        payload |> func_imports_to_term
      ), payload}
   end
@@ -149,9 +149,10 @@ defmodule Wasmtime do
     _load(payload)
   end
 
-  def func_call(pid, fn_name, params)
-      when is_pid(pid) and is_bitstring(fn_name) and is_list(params) do
-    GenServer.call(pid, {:func_call, fn_name, params})
+  def func_call(pid, fn_name, params_ty)
+      when is_pid(pid) and is_bitstring(fn_name) and is_list(params_ty) do
+    # TODO enhance params_ty with optional, and try to derive first.
+    GenServer.call(pid, {:func_call, fn_name, params_ty})
   end
 
   def exports(pid) when is_pid(pid) do

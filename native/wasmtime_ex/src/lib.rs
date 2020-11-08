@@ -73,7 +73,6 @@ fn imports_valtype_to_extern(
     let mut _func_imports: Vec<Extern> = Vec::new();
     println!("fn_imports len {:?}", fn_imports.len());
     for (func_id, func_params, func_results) in fn_imports {
-        let f = from_encoded.clone();
         // TODO refactor this, should belong to fn_imports
         let cbch_recv = cbch_recv.clone();
         let pid = gen_pid.clone();
@@ -99,12 +98,9 @@ fn imports_valtype_to_extern(
 
                 println!("executing...");
                 let mut msg_env = OwnedEnv::new();
-                // TODO why serd is scrwed up why I vec_to_terms?
-                let mut res: Vec<i32> = Vec::new();
-                // res.push(3);
-                // res.push(4);
-                msg_env.send_and_clear(&pid, |env| (atoms::call_back(), func_id, res).encode(env));
-
+                msg_env.send_and_clear(&pid, |env| {
+                    (atoms::call_back(), func_id, sval_vec_to_term(env, values)).encode(env)
+                });
                 // TODO iterate on them...
                 let v = cbch_recv.recv().unwrap();
                 println!("cbch_recv {:?}", v);
@@ -290,14 +286,11 @@ fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     let params: Vec<SVal> = vec_term_to_sval(params_ty)?;
     // TODO func call exec command...
     let mut call_args: Vec<SVal> = Vec::new();
-    SESSIONS
-        .lock()
-        .unwrap()
-        .get(&tid)
-        .unwrap()
-        .tch
-        .0
-        .send((TCmd::Call, func_name.to_string(), params));
+    SESSIONS.lock().unwrap().get(&tid).unwrap().tch.0.send((
+        TCmd::Call,
+        func_name.to_string(),
+        params,
+    ));
 
     // let store = Store::new(SESSIONS.lock().unwrap().get(&tid).unwrap().module.engine());
     // let fn_imports = imports_valtype_to_extern(fn_imports, &store, &gen_pid, &from_encoded);
@@ -498,15 +491,22 @@ fn call<'a>(
     vec_to_terms(env, res.into_vec(), func.ty().results())
 }
 
-
 fn vec_term_to_sval(params: Vec<(Term, Atom)>) -> Result<Vec<SVal>, RustlerError> {
     let mut values: Vec<SVal> = Vec::new();
     for (param, ty) in params.iter() {
         match ty {
-            x if *x == atoms::i32() => values.push(SVal{v: Val::I32(param.decode()?)}),
-            x if *x == atoms::i64() => values.push(SVal{v: Val::I64(param.decode()?)}),
-            x if *x == atoms::f32() => values.push(SVal{v: Val::F32(param.decode()?)}),
-            x if *x == atoms::f64() => values.push(SVal{v: Val::F64(param.decode()?)}),
+            x if *x == atoms::i32() => values.push(SVal {
+                v: Val::I32(param.decode()?),
+            }),
+            x if *x == atoms::i64() => values.push(SVal {
+                v: Val::I64(param.decode()?),
+            }),
+            x if *x == atoms::f32() => values.push(SVal {
+                v: Val::F32(param.decode()?),
+            }),
+            x if *x == atoms::f64() => values.push(SVal {
+                v: Val::F64(param.decode()?),
+            }),
             _ => (),
         };
     }
@@ -521,4 +521,19 @@ fn sval_to_term<'a>(env: Env<'a>, send_val: &SVal) -> Term<'a> {
         ValType::F64 => send_val.v.unwrap_f64().encode(env),
         t => format!("Unsuported type {}", t).encode(env),
     }
+}
+
+fn sval_vec_to_term<'a>(env: Env<'a>, params: Vec<SVal>) -> Term<'a> {
+    let mut res: Vec<Term> = Vec::new();
+    for param in params {
+        match param.v.ty() {
+            ValType::I32 => res.push(param.v.unwrap_i32().encode(env)),
+            ValType::I64 => res.push(param.v.unwrap_i64().encode(env)),
+            ValType::F32 => res.push(param.v.unwrap_f32().encode(env)),
+            ValType::F64 => res.push(param.v.unwrap_f64().encode(env)),
+            t => res.push(format!("Unsuported type {}", t).encode(env)),
+        };
+    }
+    // TODO should be able to error out.
+    res.encode(env)
 }
