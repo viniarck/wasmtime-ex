@@ -1,5 +1,9 @@
 // TODO
 // use rustler::schedule::SchedulerFlags;
+
+pub mod atoms;
+pub mod session;
+
 use rustler::Error as RustlerError;
 use rustler::{Atom, Encoder, Env, OwnedEnv, Pid, Term};
 
@@ -11,54 +15,11 @@ use std::sync::Mutex;
 use std::thread;
 use wasmtime::Val;
 use wasmtime::*;
+use crate::session::Session;
 
-mod atoms {
-    rustler::rustler_atoms! {
-        atom ok;
-        atom error;
-
-        atom i32;
-        atom i64;
-        atom f32;
-        atom f64;
-        atom v128;
-        atom extern_ref;
-        atom func_ref;
-
-        atom func_type;
-        atom global_type;
-        atom table_type;
-        atom memory_type;
-        atom call_back;
-        atom call_back_res;
-        atom t_ctl;
-    }
-}
-
-struct Session {
-    module: Module,
-    fn_imports: Vec<(u64, Vec<ValType>, Vec<ValType>)>,
-    tch: (crossbeam::Sender<i64>, crossbeam::Receiver<i64>),
-    fch: (crossbeam::Sender<i64>, crossbeam::Receiver<i64>),
-}
 
 lazy_static! {
     static ref SESS: Mutex<HashMap<u64, Box<Session>>> = Mutex::new(HashMap::new());
-}
-
-impl Session {
-    pub fn new(
-        module: Module,
-        tch: (crossbeam::Sender<i64>, crossbeam::Receiver<i64>),
-        fch: (crossbeam::Sender<i64>, crossbeam::Receiver<i64>),
-    ) -> Self {
-        Self {
-            module,
-            tch,
-            fch,
-            fn_imports: Vec::new(),
-        }
-    }
 }
 
 struct SVal {
@@ -288,8 +249,6 @@ fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerE
                     // TODO handle err
                     // let m = call_res.unwrap();
                     println!("t called");
-                    let k = 10;
-                    let m = 11;
                     let mut res: Vec<i32> = Vec::new();
                     // res.push(2);
                     // res.push(2);
