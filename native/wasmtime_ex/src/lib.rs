@@ -66,12 +66,11 @@ fn imports_term_to_valtype(
 fn imports_valtype_to_extern_recv(
     fn_imports: Vec<(u64, Vec<ValType>, Vec<ValType>)>,
     store: &Store,
-    fch: crossbeam::Receiver<i64>,
+    fch: crossbeam::Receiver<Vec<SVal>>,
     gen_pid: &Pid,
 ) -> Vec<Extern> {
     let mut _func_imports: Vec<Extern> = Vec::new();
     for (func_id, func_params, func_results) in fn_imports {
-        // TODO refactor this, should optionally belong to fn_imports
         let fch = fch.clone();
         let pid = gen_pid.clone();
         let fun: Extern = Func::new(
@@ -96,12 +95,9 @@ fn imports_valtype_to_extern_recv(
                 msg_env.send_and_clear(&pid, |env| {
                     (atoms::call_back(), func_id, sval_vec_to_term(env, values)).encode(env)
                 });
-                // TODO iterate on them...
-                let v = fch.recv().unwrap();
-                println!("fch recv {:?}", v);
-                _results[0] = (v as i32).into();
-                println!("fch done.");
-
+                for (i, result) in fch.recv().unwrap().iter().enumerate() {
+                    _results[i] = result.v.clone();
+                }
                 Ok(())
             },
         )
@@ -110,7 +106,6 @@ fn imports_valtype_to_extern_recv(
     }
     _func_imports
 }
-
 
 fn imports_valtype_to_extern(
     fn_imports: Vec<(u64, Vec<ValType>, Vec<ValType>)>,
@@ -124,9 +119,7 @@ fn imports_valtype_to_extern(
                 func_params.into_boxed_slice(),
                 func_results.into_boxed_slice(),
             ),
-            move |_, _, _| {
-                Ok(())
-            },
+            move |_, _, _| Ok(()),
         )
         .into();
         _func_imports.push(fun);
@@ -159,24 +152,21 @@ fn vec_to_terms<'a>(
 }
 
 fn call_back_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
-    // println!("pid1 {:?}", env.pid().as_c_arg());
     let tid: u64 = args[0].decode()?;
-    let value: i64 = args[1].decode()?;
-    // TODO protect if invalid invoke order..
-    // TODO iterate on vector params...
+    let params: Vec<(Term, Atom)> = args[1].decode()?;
+    let params = vec_term_to_sval(params)?;
 
-    SESSIONS
-        .lock()
-        .unwrap()
-        .get(&tid)
-        .unwrap()
-        .fch
-        .0
-        .send(value);
-    Ok((atoms::ok()).encode(env))
+    if let Some(session) = SESSIONS.lock().unwrap().get(&tid) {
+        match session.fch.0.send(params) {
+            Ok(_) => (),
+            Err(_) => return Ok((atoms::error(), "call_back_reply failed to send").encode(env)),
+        }
+        Ok((atoms::ok()).encode(env))
+    } else {
+        Ok((atoms::error(), "Wasm module should be loaded first").encode(env))
+    }
 }
 fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
-    // println!("pid1 {:?}", env.pid().as_c_arg());
     let tid: u64 = args[0].decode()?;
     let gen_pid: Pid = args[1].decode()?;
     let from_encoded: String = args[2].decode()?;
@@ -214,20 +204,15 @@ fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerE
                     Err(e) => return Err(e.into()),
                 }
             };
-            // let fn_imports2 = fn_imports.clone();
 
             let tch: (
                 crossbeam::Sender<(TCmd, String, Vec<SVal>)>,
                 crossbeam::Receiver<(TCmd, String, Vec<SVal>)>,
             ) = unbounded();
-            let fch: (crossbeam::Sender<i64>, crossbeam::Receiver<i64>) = unbounded();
+            let fch: (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>) = unbounded();
             let func_id = fn_imports.get(0).unwrap().0;
-            let func_imports = imports_valtype_to_extern_recv(
-                fn_imports,
-                &store,
-                fch.1.clone(),
-                &gen_pid.clone(),
-            );
+            let func_imports =
+                imports_valtype_to_extern_recv(fn_imports, &store, fch.1.clone(), &gen_pid.clone());
             let instance = match Instance::new(&store, &module, &*func_imports.into_boxed_slice()) {
                 Ok(v) => v,
                 Err(e) => return Err(e.into()),
@@ -302,7 +287,6 @@ fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     };
 
     let params: Vec<SVal> = vec_term_to_sval(params_ty)?;
-    // TODO func call exec command...
     let mut call_args: Vec<SVal> = Vec::new();
     SESSIONS.lock().unwrap().get(&tid).unwrap().tch.0.send((
         TCmd::Call,
@@ -310,7 +294,7 @@ fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
         params,
     ));
 
-    // call(env, &instance, func_name, params)
+    // TODO genserver :noreply..
     Ok(atoms::ok().encode(env))
 }
 
@@ -345,45 +329,28 @@ fn func_exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Rustler
                         ValType::I64 => params.push((atoms::i64()).encode(env)),
                         ValType::F32 => params.push((atoms::f32()).encode(env)),
                         ValType::F64 => params.push((atoms::f32()).encode(env)),
-                        ValType::V128 => {
-                            params.push((atoms::v128()).encode(env))
-                        }
-                        ValType::ExternRef => {
-                            params.push((atoms::extern_ref()).encode(env))
-                        }
-                        ValType::FuncRef => {
-                            params.push((atoms::func_ref()).encode(env))
-                        }
+                        ValType::V128 => params.push((atoms::v128()).encode(env)),
+                        ValType::ExternRef => params.push((atoms::extern_ref()).encode(env)),
+                        ValType::FuncRef => params.push((atoms::func_ref()).encode(env)),
                     };
                 }
                 for v in t.results().iter() {
                     match v {
-                        ValType::I32 => {
-                            results.push((atoms::i32()).encode(env))
-                        }
-                        ValType::I64 => {
-                            results.push((atoms::i64()).encode(env))
-                        }
-                        ValType::F32 => {
-                            results.push((atoms::f32()).encode(env))
-                        }
-                        ValType::F64 => {
-                            results.push((atoms::f32()).encode(env))
-                        }
+                        ValType::I32 => results.push((atoms::i32()).encode(env)),
+                        ValType::I64 => results.push((atoms::i64()).encode(env)),
+                        ValType::F32 => results.push((atoms::f32()).encode(env)),
+                        ValType::F64 => results.push((atoms::f32()).encode(env)),
                         t => {
                             return Ok((
                                 atoms::error(),
-                                std::format!(
-                                    "ValType not supported yet: {:?}",
-                                    t
-                                ),
+                                std::format!("ValType not supported yet: {:?}", t),
                             )
                                 .encode(env))
                         }
                     };
                 }
                 _exports.push((v.name(), params, results));
-            },
+            }
             _ => (),
         }
     }

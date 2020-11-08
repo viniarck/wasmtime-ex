@@ -125,6 +125,14 @@ defmodule Wasmtime do
     {:reply, Native.func_exports(payload.id, payload |> func_imports_to_term), payload}
   end
 
+  defp invoke_import_res_ty(payload, id, params) do
+    func_t =
+      Map.get(payload, :imports)
+      |> Map.get(id)
+
+    Enum.zip([func_t |> elem(0) |> apply(params)], func_t |> elem(2))
+  end
+
   defp invoke_import(payload, id, params) do
     Map.get(payload, :imports)
     |> Map.get(id)
@@ -176,9 +184,8 @@ defmodule Wasmtime do
     IO.inspect("call_back")
     IO.inspect(id)
     IO.inspect(params)
-    res = invoke_import(payload, id, params)
-    # TODO should've been func.id in the future.. refactor
-    Native.call_back_reply(payload.id, res)
+
+    Native.call_back_reply(payload.id, invoke_import_res_ty(payload, id, params))
     {:noreply, payload}
   end
 

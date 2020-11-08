@@ -13,7 +13,7 @@ pub struct Session {
         crossbeam::Sender<(TCmd, String, Vec<SVal>)>,
         crossbeam::Receiver<(TCmd, String, Vec<SVal>)>,
     ),
-    pub fch: (crossbeam::Sender<i64>, crossbeam::Receiver<i64>),
+    pub fch: (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>),
 }
 
 impl Session {
@@ -23,7 +23,7 @@ impl Session {
             crossbeam::Sender<(TCmd, String, Vec<SVal>)>,
             crossbeam::Receiver<(TCmd, String, Vec<SVal>)>,
         ),
-        fch: (crossbeam::Sender<i64>, crossbeam::Receiver<i64>),
+        fch: (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>),
     ) -> Self {
         Self {
             module,
