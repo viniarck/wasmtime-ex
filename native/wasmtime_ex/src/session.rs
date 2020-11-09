@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use wasmtime::{Module, Val, ValType};
 
 #[derive(Debug)]
@@ -13,7 +14,7 @@ pub struct Session {
         crossbeam::Sender<(TCmd, String, Vec<SVal>)>,
         crossbeam::Receiver<(TCmd, String, Vec<SVal>)>,
     ),
-    pub fch: (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>),
+    pub fchs: HashMap<u64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>,
 }
 
 impl Session {
@@ -23,12 +24,12 @@ impl Session {
             crossbeam::Sender<(TCmd, String, Vec<SVal>)>,
             crossbeam::Receiver<(TCmd, String, Vec<SVal>)>,
         ),
-        fch: (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>),
+        fchs: HashMap<u64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>,
     ) -> Self {
         Self {
             module,
             tch,
-            fch,
+            fchs,
             fn_imports: Vec::new(),
         }
     }

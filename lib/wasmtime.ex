@@ -172,10 +172,10 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_info({:call_back_res, id, params}, payload) do
+  def handle_info({:call_back_res, from, results}, payload) do
     IO.inspect("call_back_res")
-    IO.inspect(id)
-    IO.inspect(params)
+    IO.inspect(from)
+    IO.inspect(results)
     {:noreply, payload}
   end
 
@@ -185,7 +185,7 @@ defmodule Wasmtime do
     IO.inspect(id)
     IO.inspect(params)
 
-    Native.call_back_reply(payload.id, invoke_import_res_ty(payload, id, params))
+    Native.call_back_reply(payload.id, id, invoke_import_res_ty(payload, id, params))
     {:noreply, payload}
   end
 

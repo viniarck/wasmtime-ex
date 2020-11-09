@@ -10,7 +10,7 @@ defmodule Wasmtime.Native do
   def func_call(_id, _gen_pid, _from_pid, _func, _params, _func_imports),
     do: :erlang.nif_error(:nif_not_loaded)
 
-  def call_back_reply(_id, _value), do: :erlang.nif_error(:nif_not_loaded)
+  def call_back_reply(_id, _func_id, _results), do: :erlang.nif_error(:nif_not_loaded)
 
   def func_exports(_id, _func_imports), do: :erlang.nif_error(:nif_not_loaded)
 

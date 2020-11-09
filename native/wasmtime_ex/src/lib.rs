@@ -26,7 +26,7 @@ rustler::rustler_export_nifs! {
     [
         ("load_from_t", 6, load_from_t),
         ("func_call", 6, func_call),
-        ("call_back_reply", 2, call_back_reply),
+        ("call_back_reply", 3, call_back_reply),
         ("exports", 2, exports),
         ("func_exports", 2, func_exports),
     ],
@@ -66,12 +66,13 @@ fn imports_term_to_valtype(
 fn imports_valtype_to_extern_recv(
     fn_imports: Vec<(u64, Vec<ValType>, Vec<ValType>)>,
     store: &Store,
-    fch: crossbeam::Receiver<Vec<SVal>>,
+    fchs: &mut HashMap<u64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>,
     gen_pid: &Pid,
 ) -> Vec<Extern> {
     let mut _func_imports: Vec<Extern> = Vec::new();
     for (func_id, func_params, func_results) in fn_imports {
-        let fch = fch.clone();
+        let fch: (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>) = unbounded();
+        fchs.insert(func_id, fch.clone());
         let pid = gen_pid.clone();
         let fun: Extern = Func::new(
             &store,
@@ -95,7 +96,7 @@ fn imports_valtype_to_extern_recv(
                 msg_env.send_and_clear(&pid, |env| {
                     (atoms::call_back(), func_id, sval_vec_to_term(env, values)).encode(env)
                 });
-                for (i, result) in fch.recv().unwrap().iter().enumerate() {
+                for (i, result) in fch.1.recv().unwrap().iter().enumerate() {
                     _results[i] = result.v.clone();
                 }
                 Ok(())
@@ -153,15 +154,17 @@ fn vec_to_terms<'a>(
 
 fn call_back_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: u64 = args[0].decode()?;
-    let params: Vec<(Term, Atom)> = args[1].decode()?;
-    let params = vec_term_to_sval(params)?;
+    let func_id: u64 = args[1].decode()?;
+    let results: Vec<(Term, Atom)> = args[2].decode()?;
+    let results = vec_term_to_sval(results)?;
 
     if let Some(session) = SESSIONS.lock().unwrap().get(&tid) {
-        match session.fch.0.send(params) {
-            Ok(_) => (),
-            Err(_) => return Ok((atoms::error(), "call_back_reply failed to send").encode(env)),
+        if let Some(fch) = session.fchs.get(&func_id) {
+            fch.0.send(results);
+            Ok((atoms::ok()).encode(env))
+        } else {
+            Ok((atoms::error(), "call_back_reply failed to send").encode(env))
         }
-        Ok((atoms::ok()).encode(env))
     } else {
         Ok((
             atoms::error(),
@@ -193,7 +196,6 @@ fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerE
             fn_imports: Vec<(u64, Vec<ValType>, Vec<ValType>)>,
         ) -> Result<(), Box<dyn Error>> {
             let store = Store::default();
-
             let mut not_stopped = true;
             let mut msg_env = OwnedEnv::new();
 
@@ -213,16 +215,19 @@ fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerE
                 crossbeam::Sender<(TCmd, String, Vec<SVal>)>,
                 crossbeam::Receiver<(TCmd, String, Vec<SVal>)>,
             ) = unbounded();
-            let fch: (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>) = unbounded();
-            let func_id = fn_imports.get(0).unwrap().0;
+
+            let mut fchs: HashMap<
+                u64,
+                (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>),
+            > = HashMap::new();
             let func_imports =
-                imports_valtype_to_extern_recv(fn_imports, &store, fch.1.clone(), &gen_pid.clone());
+                imports_valtype_to_extern_recv(fn_imports, &store, &mut fchs, &gen_pid.clone());
             let instance = match Instance::new(&store, &module, &*func_imports.into_boxed_slice()) {
                 Ok(v) => v,
                 Err(e) => return Err(e.into()),
             };
 
-            let session = Box::new(Session::new(module, tch, fch));
+            let session = Box::new(Session::new(module, tch, fchs));
             let tch_recv = session.tch.1.clone();
             SESSIONS.lock().unwrap().insert(tid, session);
 
@@ -233,7 +238,6 @@ fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerE
             while not_stopped {
                 let val = tch_recv.recv();
                 msg_env.send_and_clear(gen_pid, |env| {
-                    // TODO get func_id from call resp
                     let val = val.unwrap();
                     match val.0 {
                         TCmd::Call => {
@@ -246,7 +250,7 @@ fn load_from_t<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerE
                                 Ok(v) => v,
                                 Err(_) => (atoms::error(), "func_call failed to call").encode(env),
                             };
-                            (atoms::call_back_res(), func_id, call_res).encode(env)
+                            (atoms::call_back_res(), from_encoded, call_res).encode(env)
                         }
                         TCmd::Stop => {
                             not_stopped = true;
@@ -376,11 +380,8 @@ fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         };
         let fn_imports = imports_valtype_to_extern(fn_imports, &store);
-        let instance = match Instance::new(
-            &store,
-            &session.module,
-            &*fn_imports.into_boxed_slice(),
-        ) {
+        let instance = match Instance::new(&store, &session.module, &*fn_imports.into_boxed_slice())
+        {
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         };
