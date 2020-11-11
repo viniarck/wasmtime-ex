@@ -31,17 +31,18 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_call({:func_call, fn_name, params_ty}, from, payload) do
-    # TODO switch to no reply... i'll have to pass the gen_pid and from serd...
-    {:reply,
-     Native.func_call(
-       payload.id,
-       self(),
-       from |> pidref_encode,
-       fn_name,
-       params_ty,
-       payload |> func_imports_to_term
-     ), payload}
+  def handle_call({:func_call, fn_name, params}, from, payload) do
+
+    payload = Map.put(payload, from |> pidref_encode, from)
+    Native.func_call(
+      payload.id,
+      from |> pidref_encode(),
+      fn_name,
+      params,
+      payload |> func_imports_to_term
+    )
+
+    {:noreply, payload}
   end
 
   defp func_imports_to_term(payload) do
@@ -63,8 +64,6 @@ defmodule Wasmtime do
 
   @impl true
   def handle_call({:load_from_t}, from, payload) do
-    # TODO continue here..
-    # payload = Map.put(payload, :from, from)
     payload = Map.put(payload, from |> pidref_encode, from)
 
     case payload do
@@ -90,29 +89,6 @@ defmodule Wasmtime do
     end
 
     {:noreply, payload}
-  end
-
-  @impl true
-  def handle_call({:load}, _from, payload) do
-    case payload do
-      payload = %FromBytes{} ->
-        {:reply,
-         Native.load_from(
-           payload.id,
-           "",
-           payload.bytes |> :binary.bin_to_list(),
-           payload |> func_imports_to_term
-         ), payload}
-
-      payload = %FromFile{} ->
-        {:reply,
-         Native.load_from(
-           payload.id,
-           payload.file_path,
-           [],
-           payload |> func_imports_to_term
-         ), payload}
-    end
   end
 
   @impl true
@@ -157,10 +133,9 @@ defmodule Wasmtime do
     _load(payload)
   end
 
-  def func_call(pid, fn_name, params_ty)
-      when is_pid(pid) and is_bitstring(fn_name) and is_list(params_ty) do
-    # TODO enhance params_ty with optional, and try to derive first.
-    GenServer.call(pid, {:func_call, fn_name, params_ty})
+  def func_call(pid, fn_name, params)
+      when is_pid(pid) and is_bitstring(fn_name) and is_list(params) do
+    GenServer.call(pid, {:func_call, fn_name, params})
   end
 
   def exports(pid) when is_pid(pid) do
@@ -173,30 +148,19 @@ defmodule Wasmtime do
 
   @impl true
   def handle_info({:call_back_res, from, results}, payload) do
-    IO.inspect("call_back_res")
-    IO.inspect(from)
-    IO.inspect(results)
-    {:noreply, payload}
+    GenServer.reply(Map.get(payload, from), results)
+    {:noreply, Map.delete(payload, from)}
   end
 
   @impl true
   def handle_info({:call_back, id, params}, payload) do
-    IO.inspect("call_back")
-    IO.inspect(id)
-    IO.inspect(params)
-
     Native.call_back_reply(payload.id, id, invoke_import_res_ty(payload, id, params))
     {:noreply, payload}
   end
 
   @impl true
   def handle_info({:t_ctl, from, msg}, payload) do
-    IO.inspect("handling t_ctl #{msg}")
     GenServer.reply(Map.get(payload, from), msg)
-    # case msg do
-    #   :ok -> IO.inspect("ok baby")
-    #   {:error, msg} -> IO.inspect("error #{msg}")
-    # end
-    {:noreply, payload}
+    {:noreply, Map.delete(payload, from)}
   end
 end
