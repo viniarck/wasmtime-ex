@@ -1,0 +1,19 @@
+# Pre-commit git hooks, run locally before every commit
+# Init with
+# $ pip install pre-commit
+# $ pre-commit install
+- repo: local
+  hooks:
+
+  - id: mix-format
+    name: 'elixir: mix format'
+    entry: mix format --check-formatted
+    language: system
+    files: \.exs*$
+
+- repo: git://github.com/pre-commit/pre-commit-hooks
+  rev: v1.4.0
+  hooks:
+  - id: trailing-whitespace
+  - id: check-merge-conflict
+  - id: end-of-file-fixer
