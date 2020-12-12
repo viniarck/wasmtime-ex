@@ -25,9 +25,9 @@ rustler::rustler_export_nifs! {
 
         ("load_from", 6, load_from),
         ("func_call", 6, func_call, SchedulerFlags::DirtyCpu),
+        ("get_func", 3, get_func),
         ("exfn_reply", 3, exfn_reply, SchedulerFlags::DirtyCpu),
         ("exports", 2, exports),
-        ("func_exports", 2, func_exports),
     ],
     None
 }
@@ -406,9 +406,10 @@ fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     Ok((atoms::ok()).encode(env))
 }
 
-fn func_exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
+fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: i64 = args[0].decode()?;
-    let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[1].decode()?;
+    let func_name: String = args[1].decode()?;
+    let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[2].decode()?;
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
@@ -422,45 +423,46 @@ fn func_exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Rustler
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         };
-
-        let mut _exports: Vec<(&str, Vec<Term>, Vec<Term>)> = Vec::new();
-        for v in instance.exports() {
-            match v.ty() {
-                ExternType::Func(t) => {
-                    let mut params: Vec<Term> = Vec::new();
-                    let mut results: Vec<Term> = Vec::new();
-                    for v in t.params().iter() {
-                        match v {
-                            ValType::I32 => params.push((atoms::i32()).encode(env)),
-                            ValType::I64 => params.push((atoms::i64()).encode(env)),
-                            ValType::F32 => params.push((atoms::f32()).encode(env)),
-                            ValType::F64 => params.push((atoms::f32()).encode(env)),
-                            ValType::V128 => params.push((atoms::v128()).encode(env)),
-                            ValType::ExternRef => params.push((atoms::extern_ref()).encode(env)),
-                            ValType::FuncRef => params.push((atoms::func_ref()).encode(env)),
-                        };
-                    }
-                    for v in t.results().iter() {
-                        match v {
-                            ValType::I32 => results.push((atoms::i32()).encode(env)),
-                            ValType::I64 => results.push((atoms::i64()).encode(env)),
-                            ValType::F32 => results.push((atoms::f32()).encode(env)),
-                            ValType::F64 => results.push((atoms::f32()).encode(env)),
-                            t => {
-                                return Ok((
-                                    atoms::error(),
-                                    std::format!("ValType not supported yet: {:?}", t),
-                                )
-                                    .encode(env))
-                            }
-                        };
-                    }
-                    _exports.push((v.name(), params, results));
+        match instance.get_func(&func_name) {
+            Some(f) => {
+                let mut params: Vec<Term> = Vec::new();
+                let mut results: Vec<Term> = Vec::new();
+                for v in f.ty().params().iter() {
+                    match v {
+                        ValType::I32 => params.push((atoms::i32()).encode(env)),
+                        ValType::I64 => params.push((atoms::i64()).encode(env)),
+                        ValType::F32 => params.push((atoms::f32()).encode(env)),
+                        ValType::F64 => params.push((atoms::f32()).encode(env)),
+                        ValType::V128 => params.push((atoms::v128()).encode(env)),
+                        ValType::ExternRef => params.push((atoms::extern_ref()).encode(env)),
+                        ValType::FuncRef => params.push((atoms::func_ref()).encode(env)),
+                    };
                 }
-                _ => (),
+                for v in f.ty().results().iter() {
+                    match v {
+                        ValType::I32 => results.push((atoms::i32()).encode(env)),
+                        ValType::I64 => results.push((atoms::i64()).encode(env)),
+                        ValType::F32 => results.push((atoms::f32()).encode(env)),
+                        ValType::F64 => results.push((atoms::f32()).encode(env)),
+                        t => {
+                            return Ok((
+                                atoms::error(),
+                                std::format!("ValType not supported yet: {:?}", t),
+                            )
+                                .encode(env))
+                        }
+                    };
+                }
+                return Ok((atoms::ok(), (func_name, params, results)).encode(env))
             }
-        }
-        Ok((atoms::ok(), _exports).encode(env))
+            None => {
+                return Ok((
+                    atoms::error(),
+                    std::format!("function {:?} not found", func_name),
+                )
+                    .encode(env))
+            }
+        };
     } else {
         Ok((
             atoms::error(),

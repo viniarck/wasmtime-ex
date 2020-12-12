@@ -13,7 +13,7 @@ defmodule WasmtimeTest do
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
     {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
-    {:ok, [{"add", [:i32, :i32], [:i32]}]} = Wasmtime.func_exports(pid)
+    {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
     a = 6
     b = 4
     expected = a + b
@@ -22,7 +22,7 @@ defmodule WasmtimeTest do
 
   test "load wat from file" do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
-    {:ok, [{"add", [:i32, :i32], [:i32]}]} = Wasmtime.func_exports(pid)
+    {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
   end
 
   test "add [:i64, :i64], [:i64]" do
@@ -36,7 +36,7 @@ defmodule WasmtimeTest do
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
     {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
-    {:ok, [{"add", [:i64, :i64], [:i64]}]} = Wasmtime.func_exports(pid)
+    {:ok, {"add", [:i64, :i64], [:i64]}} = Wasmtime.get_func(pid, "add")
     {:ok, [8_589_934_593]} = Wasmtime.func_call(pid, "add", [8_589_934_592, 1])
   end
 
@@ -51,7 +51,7 @@ defmodule WasmtimeTest do
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
     {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
-    {:ok, [{"add", [:f32, :f32], [:f32]}]} = Wasmtime.func_exports(pid)
+    {:ok, {"add", [:f32, :f32], [:f32]}} = Wasmtime.get_func(pid, "add")
     a = 2.1
     b = 1.3
     expected = Float.round(a + b, 5)
@@ -80,7 +80,7 @@ defmodule WasmtimeTest do
     {:ok, [200]} = Wasmtime.func_call(pid, "run", [180])
   end
 
-  test "call a non existing function" do
+  test "func_call non existing function" do
     mod = ~S/
     (module
       (func (export "add") (param i32 i32) (result i32)
@@ -91,6 +91,32 @@ defmodule WasmtimeTest do
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
     {:error, "function \"non_existing\" not found"} = Wasmtime.func_call(pid, "non_existing", [1])
+  end
+
+  test "get_func" do
+    mod = ~S/
+    (module
+      (func (export "add") (param i32 i32) (result i32)
+        local.get 0
+        local.get 1
+        i32.add)
+    )
+    /
+    {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+    {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+  end
+
+  test "get_func not found" do
+    mod = ~S/
+    (module
+      (func (export "add") (param i32 i32) (result i32)
+        local.get 0
+        local.get 1
+        i32.add)
+    )
+    /
+    {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+    {:error, "function \"sub\" not found"} = Wasmtime.get_func(pid, "sub")
   end
 
   test "Wasmtime.load(payload) must be called first" do

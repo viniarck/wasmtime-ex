@@ -12,7 +12,7 @@ defmodule Wasmtime.Native do
 
   def exfn_reply(_id, _func_id, _results), do: :erlang.nif_error(:nif_not_loaded)
 
-  def func_exports(_id, _func_imports), do: :erlang.nif_error(:nif_not_loaded)
+  def get_func(_id, _func_name, _func_imports), do: :erlang.nif_error(:nif_not_loaded)
 
   def exports(_id, _func_imports), do: :erlang.nif_error(:nif_not_loaded)
 end
