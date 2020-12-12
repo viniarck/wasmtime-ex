@@ -30,27 +30,6 @@ defmodule Wasmtime do
     )
   end
 
-  defp params_to_tys(params) do
-    Enum.map(params, fn x ->
-      case x do
-        x when is_integer(x) and x >= -2_147_483_648 and x <= 2_147_483_647 ->
-          :i32
-
-        x when is_integer(x) ->
-          :i64
-
-        x
-        when is_float(x) and x >= -340_282_350_000_000_000_000_000_000_000_000_000_000.0 and
-               x <= 340_282_350_000_000_000_000_000_000_000_000_000_000.0 ->
-          :f32
-
-        x
-        when is_float(x) ->
-          :f64
-      end
-    end)
-  end
-
   defp pidref_encode(pid_ref) do
     pid_ref |> :erlang.term_to_binary() |> Base.encode64()
   end
@@ -58,7 +37,7 @@ defmodule Wasmtime do
   defp func_imports_to_term(payload) do
     imps = Map.get(payload, :imports)
 
-    Enum.reduce(Map.keys(imps), [], fn x, acc ->
+    Enum.reduce(Map.keys(imps) |> Enum.sort(), [], fn x, acc ->
       [{x, Map.get(imps, x) |> elem(1), Map.get(imps, x) |> elem(2)} | acc]
     end)
     |> Enum.reverse()
@@ -74,7 +53,6 @@ defmodule Wasmtime do
       from |> pidref_encode(),
       fn_name,
       params,
-      params |> params_to_tys(),
       payload |> func_imports_to_term
     )
 
@@ -93,7 +71,7 @@ defmodule Wasmtime do
           from |> pidref_encode(),
           "",
           payload.bytes |> :binary.bin_to_list(),
-          Map.get(payload, :imports) |> Map.keys() |> Enum.sort()
+          payload |> func_imports_to_term
         )
 
       payload = %FromFile{} ->
@@ -103,7 +81,7 @@ defmodule Wasmtime do
           from |> pidref_encode(),
           payload.file_path,
           [],
-          Map.get(payload, :imports) |> Map.keys() |> Enum.sort()
+          payload |> func_imports_to_term
         )
     end
 
