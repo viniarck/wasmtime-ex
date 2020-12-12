@@ -19,26 +19,28 @@ defmodule Wasmtime do
   end
 
   defp init_payload(payload) do
-    payload = Map.put(payload, :id, System.unique_integer([:positive]))
+    payload = Map.put(payload, :id, System.unique_integer([:monotonic]))
 
     Map.put(
       payload,
       :imports,
       Enum.reduce(payload.func_imports, %{}, fn x, acc ->
-        Map.put(acc, System.unique_integer([:positive]), {elem(x, 0), elem(x, 1), elem(x, 2)})
+        Map.put(acc, System.unique_integer([:monotonic]), {elem(x, 0), elem(x, 1), elem(x, 2)})
       end)
     )
   end
 
   @impl true
   def handle_call({:func_call, fn_name, params}, from, payload) do
-
     payload = Map.put(payload, from |> pidref_encode, from)
+
     Native.func_call(
       payload.id,
+      self(),
       from |> pidref_encode(),
       fn_name,
       params,
+      params |> params_to_tys(),
       payload |> func_imports_to_term
     )
 
@@ -54,6 +56,27 @@ defmodule Wasmtime do
     |> Enum.reverse()
   end
 
+  defp params_to_tys(params) do
+    Enum.map(params, fn x ->
+      case x do
+        x when is_integer(x) and x >= -2_147_483_648 and x <= 2_147_483_647 ->
+          :i32
+
+        x when is_integer(x) ->
+          :i64
+
+        x
+        when is_float(x) and x >= -340_282_350_000_000_000_000_000_000_000_000_000_000.0 and
+               x <= 340_282_350_000_000_000_000_000_000_000_000_000_000.0 ->
+          :f32
+
+        x
+        when is_float(x) ->
+          :f64
+      end
+    end)
+  end
+
   defp pidref_encode(pid_ref) do
     pid_ref |> :erlang.term_to_binary() |> Base.encode64()
   end
@@ -63,28 +86,28 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_call({:load_from_t}, from, payload) do
+  def handle_call({:load_from}, from, payload) do
     payload = Map.put(payload, from |> pidref_encode, from)
 
     case payload do
       payload = %FromBytes{} ->
-        Native.load_from_t(
+        Native.load_from(
           payload.id,
           self(),
           from |> pidref_encode(),
           "",
           payload.bytes |> :binary.bin_to_list(),
-          payload |> func_imports_to_term
+          Map.get(payload, :imports) |> Map.keys() |> Enum.sort()
         )
 
       payload = %FromFile{} ->
-        Native.load_from_t(
+        Native.load_from(
           payload.id,
           self(),
           from |> pidref_encode(),
           payload.file_path,
           [],
-          payload |> func_imports_to_term
+          Map.get(payload, :imports) |> Map.keys() |> Enum.sort()
         )
     end
 
@@ -119,7 +142,7 @@ defmodule Wasmtime do
   defp _load(payload) do
     {:ok, pid} = GenServer.start_link(__MODULE__, payload)
 
-    case GenServer.call(pid, {:load_from_t}) do
+    case GenServer.call(pid, {:load_from}) do
       :ok -> {:ok, pid}
       {:error, msg} -> {:error, msg}
     end
@@ -147,20 +170,15 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_info({:call_back_res, from, results}, payload) do
+  def handle_info({:gen_reply, from, results}, payload) do
     GenServer.reply(Map.get(payload, from), results)
     {:noreply, Map.delete(payload, from)}
   end
 
   @impl true
-  def handle_info({:call_back, id, params}, payload) do
-    Native.call_back_reply(payload.id, id, invoke_import_res_ty(payload, id, params))
+  def handle_info({:call_exfn, id, params}, payload) do
+    Native.exfn_reply(payload.id, id, invoke_import_res_ty(payload, id, params))
     {:noreply, payload}
   end
 
-  @impl true
-  def handle_info({:t_ctl, from, msg}, payload) do
-    GenServer.reply(Map.get(payload, from), msg)
-    {:noreply, Map.delete(payload, from)}
-  end
 end
