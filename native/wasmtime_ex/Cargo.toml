@@ -12,5 +12,5 @@ crate-type = ["dylib"]
 [dependencies]
 rustler = "0.21.1"
 lazy_static = "1.0"
-wasmtime = "0.20.0"
+wasmtime = "0.21.0"
 crossbeam = "0.6.0"
