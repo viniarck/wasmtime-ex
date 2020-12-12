@@ -44,7 +44,7 @@ mod = ~S/
 {:ok, [200]} = Wasmtime.func_call(pid, "run", [180])
 ```
 
-If you were to execute this snippet, you'd see:
+If you were to execute this code snippet, you'd see this message in the stdout:
 
 ```
 "Hello from Elixir! Got 180. Returning an i32 value"

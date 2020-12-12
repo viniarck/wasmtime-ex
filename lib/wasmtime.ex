@@ -94,8 +94,8 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_call({:func_exports}, _from, payload) do
-    {:reply, Native.func_exports(payload.id, payload |> func_imports_to_term), payload}
+  def handle_call({:get_func, fn_name}, _from, payload) do
+    {:reply, Native.get_func(payload.id, fn_name, payload |> func_imports_to_term), payload}
   end
 
   defp invoke_import_res_ty(payload, id, params) do
@@ -132,8 +132,8 @@ defmodule Wasmtime do
     GenServer.call(pid, {:exports})
   end
 
-  def func_exports(pid) when is_pid(pid) do
-    GenServer.call(pid, {:func_exports})
+  def get_func(pid, fn_name) when is_pid(pid) and is_bitstring(fn_name) do
+    GenServer.call(pid, {:get_func, fn_name})
   end
 
   @impl true
