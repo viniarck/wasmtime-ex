@@ -59,6 +59,25 @@ defmodule WasmtimeTest do
     ^expected = Float.round(result, 5)
   end
 
+  test "add [:f64, :f64], [:f64]" do
+    mod = ~S/
+    (module
+      (func (export "add") (param f64 f64) (result f64)
+        local.get 0
+        local.get 1
+        f64.add)
+    )
+    /
+    {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+    {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
+    {:ok, {"add", [:f64, :f64], [:f64]}} = Wasmtime.get_func(pid, "add")
+    a = 2.1
+    b = 1.3
+    expected = Float.round(a + b, 5)
+    {:ok, [result]} = Wasmtime.func_call(pid, "add", [a, b])
+    ^expected = Float.round(result, 5)
+  end
+
   test "import func [:i32], [:i32]" do
     mod = ~S/
     (module

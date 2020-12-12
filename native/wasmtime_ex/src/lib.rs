@@ -432,7 +432,7 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
                         ValType::I32 => params.push((atoms::i32()).encode(env)),
                         ValType::I64 => params.push((atoms::i64()).encode(env)),
                         ValType::F32 => params.push((atoms::f32()).encode(env)),
-                        ValType::F64 => params.push((atoms::f32()).encode(env)),
+                        ValType::F64 => params.push((atoms::f64()).encode(env)),
                         ValType::V128 => params.push((atoms::v128()).encode(env)),
                         ValType::ExternRef => params.push((atoms::extern_ref()).encode(env)),
                         ValType::FuncRef => params.push((atoms::func_ref()).encode(env)),
@@ -443,7 +443,7 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
                         ValType::I32 => results.push((atoms::i32()).encode(env)),
                         ValType::I64 => results.push((atoms::i64()).encode(env)),
                         ValType::F32 => results.push((atoms::f32()).encode(env)),
-                        ValType::F64 => results.push((atoms::f32()).encode(env)),
+                        ValType::F64 => results.push((atoms::f64()).encode(env)),
                         t => {
                             return Ok((
                                 atoms::error(),
