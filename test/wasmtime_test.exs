@@ -37,9 +37,7 @@ defmodule WasmtimeTest do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
     {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
     {:ok, [{"add", [:i64, :i64], [:i64]}]} = Wasmtime.func_exports(pid)
-    # TODO // remove inference cache func tys
-    # {:ok, [8589934593]} = Wasmtime.func_call(pid, "add", [8589934592, 1])
-    {:ok, [17_179_869_184]} = Wasmtime.func_call(pid, "add", [8_589_934_592, 8_589_934_592])
+    {:ok, [8_589_934_593]} = Wasmtime.func_call(pid, "add", [8_589_934_592, 1])
   end
 
   test "add [:f32, :f32], [:f32]" do
@@ -59,5 +57,55 @@ defmodule WasmtimeTest do
     expected = Float.round(a + b, 5)
     {:ok, [result]} = Wasmtime.func_call(pid, "add", [a, b])
     ^expected = Float.round(result, 5)
+  end
+
+  test "import func [:i32], [:i32]" do
+    mod = ~S/
+    (module
+      (import "" "" (func $compute (param i32) (result i32)))
+      (func (export "run") (param i32) (result i32) (call $compute (local.get 0)))
+    )
+    /
+
+    {:ok, pid} =
+      Wasmtime.load(%Wasmtime.FromBytes{
+        bytes: mod,
+        func_imports: [
+          {fn x ->
+             20 + x
+           end, [:i32], [:i32]}
+        ]
+      })
+
+    {:ok, [200]} = Wasmtime.func_call(pid, "run", [180])
+  end
+
+  test "call a non existing function" do
+    mod = ~S/
+    (module
+      (func (export "add") (param i32 i32) (result i32)
+        local.get 0
+        local.get 1
+        i32.add)
+    )
+    /
+    {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+    {:error, "function \"non_existing\" not found"} = Wasmtime.func_call(pid, "non_existing", [1])
+  end
+
+  test "Wasmtime.load(payload) must be called first" do
+    mod = ~S/
+    (module
+      (func (export "add") (param i32 i32) (result i32)
+        local.get 0
+        local.get 1
+        i32.add)
+    )
+    /
+
+    {:ok, pid} = GenServer.start_link(Wasmtime, %Wasmtime.FromBytes{bytes: mod})
+
+    {:error, "Wasmtime.load(payload) hasn't been called yet"} =
+      Wasmtime.func_call(pid, "non_existing", [1])
   end
 end
