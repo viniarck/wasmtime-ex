@@ -77,8 +77,8 @@ fn imports_valtype_to_extern_recv(
                 let fun: Extern = Func::new(
                     &store,
                     FuncType::new(
-                        func_params.into_boxed_slice(),
-                        func_results.into_boxed_slice(),
+                        func_params.into_iter(),
+                        func_results.into_iter(),
                     ),
                     move |_, params, _results| {
                         let mut values: Vec<SVal> = Vec::new();
@@ -120,8 +120,8 @@ fn imports_valtype_to_extern(
         let fun: Extern = Func::new(
             &store,
             FuncType::new(
-                func_params.into_boxed_slice(),
-                func_results.into_boxed_slice(),
+                func_params.into_iter(),
+                func_results.into_iter(),
             ),
             move |_, _, _| Ok(()),
         )
@@ -205,7 +205,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                 match v.ty() {
                     ExternType::Func(t) => {
                         let mut params: Vec<SValType> = Vec::new();
-                        for param in t.params().iter() {
+                        for param in t.params() {
                             params.push(SValType { ty: param.clone() });
                         }
                         exports.insert(v.name().to_string(), params);
@@ -355,7 +355,7 @@ fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                     };
 
                     let mut results: Vec<Term> = Vec::new();
-                    for (i, v) in func.ty().results().iter().enumerate() {
+                    for (i, v) in func.ty().results().enumerate() {
                         match v {
                             ValType::I32 => {
                                 results.push((call_res.get(i).unwrap().unwrap_i32()).encode(env))
@@ -427,7 +427,7 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
             Some(f) => {
                 let mut params: Vec<Term> = Vec::new();
                 let mut results: Vec<Term> = Vec::new();
-                for v in f.ty().params().iter() {
+                for v in f.ty().params() {
                     match v {
                         ValType::I32 => params.push((atoms::i32()).encode(env)),
                         ValType::I64 => params.push((atoms::i64()).encode(env)),
@@ -438,7 +438,7 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
                         ValType::FuncRef => params.push((atoms::func_ref()).encode(env)),
                     };
                 }
-                for v in f.ty().results().iter() {
+                for v in f.ty().results() {
                     match v {
                         ValType::I32 => results.push((atoms::i32()).encode(env)),
                         ValType::I64 => results.push((atoms::i64()).encode(env)),
