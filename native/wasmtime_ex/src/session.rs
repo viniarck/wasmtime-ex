@@ -3,18 +3,15 @@ use wasmtime::{Module, Val};
 
 pub struct Session {
     pub module: Module,
-    pub fchs: HashMap<i64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>
+    pub fchs: HashMap<i64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>,
 }
 
 impl Session {
     pub fn new(
         module: Module,
-        fchs: HashMap<i64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>
+        fchs: HashMap<i64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>,
     ) -> Self {
-        Self {
-            module,
-            fchs,
-        }
+        Self { module, fchs }
     }
 }
 

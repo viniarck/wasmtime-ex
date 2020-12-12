@@ -1,9 +1,9 @@
 pub mod atoms;
 pub mod session;
 
+use rustler::schedule::SchedulerFlags;
 use rustler::Error as RustlerError;
 use rustler::{Atom, Encoder, Env, OwnedEnv, Pid, Term};
-use rustler::schedule::SchedulerFlags;
 
 use crate::session::{SVal, Session};
 use crossbeam::channel::unbounded;
@@ -33,7 +33,7 @@ rustler::rustler_export_nifs! {
 }
 
 fn imports_term_to_valtype(
-    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>
+    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>,
 ) -> Result<Vec<(i64, Vec<ValType>, Vec<ValType>)>, Box<dyn Error>> {
     let mut fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)> = Vec::new();
     for (f_id, params, results) in func_imports.iter() {
@@ -293,7 +293,7 @@ fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                             };
                         }
 
-                        (atoms::gen_reply(), from_encoded, results).encode(env)
+                        (atoms::gen_reply(), from_encoded, (atoms::ok(), results)).encode(env)
                     });
                 } else {
                     return Err(std::format!("function {:?} not found", func_name).into());
@@ -469,12 +469,18 @@ fn params_ty_sval_vec(params: &Vec<Term>, tys: &Vec<Atom>) -> Result<Vec<SVal>, 
             x if *x == atoms::i64() => values.push(SVal {
                 v: Val::I64(param.decode()?),
             }),
-            x if *x == atoms::f32() => values.push(SVal {
-                v: Val::F32(param.decode()?),
-            }),
-            x if *x == atoms::f64() => values.push(SVal {
-                v: Val::F64(param.decode()?),
-            }),
+            x if *x == atoms::f32() => {
+                let arg: f32 = param.decode()?;
+                values.push(SVal {
+                    v: Val::F32(arg.to_bits()),
+                })
+            }
+            x if *x == atoms::f64() => {
+                let arg: f64 = param.decode()?;
+                values.push(SVal {
+                    v: Val::F64(arg.to_bits()),
+                })
+            }
             _ => (),
         };
     }

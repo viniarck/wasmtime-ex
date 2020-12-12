@@ -180,5 +180,4 @@ defmodule Wasmtime do
     Native.exfn_reply(payload.id, id, invoke_import_res_ty(payload, id, params))
     {:noreply, payload}
   end
-
 end
