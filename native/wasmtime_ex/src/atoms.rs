@@ -14,7 +14,6 @@ rustler::rustler_atoms! {
     atom global_type;
     atom table_type;
     atom memory_type;
-    atom call_back;
-    atom call_back_res;
-    atom t_ctl;
+    atom call_exfn;
+    atom gen_reply;
 }
