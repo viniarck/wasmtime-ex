@@ -30,32 +30,6 @@ defmodule Wasmtime do
     )
   end
 
-  @impl true
-  def handle_call({:func_call, fn_name, params}, from, payload) do
-    payload = Map.put(payload, from |> pidref_encode, from)
-
-    Native.func_call(
-      payload.id,
-      self(),
-      from |> pidref_encode(),
-      fn_name,
-      params,
-      params |> params_to_tys(),
-      payload |> func_imports_to_term
-    )
-
-    {:noreply, payload}
-  end
-
-  defp func_imports_to_term(payload) do
-    imps = Map.get(payload, :imports)
-
-    Enum.reduce(Map.keys(imps), [], fn x, acc ->
-      [{x, Map.get(imps, x) |> elem(1), Map.get(imps, x) |> elem(2)} | acc]
-    end)
-    |> Enum.reverse()
-  end
-
   defp params_to_tys(params) do
     Enum.map(params, fn x ->
       case x do
@@ -81,8 +55,30 @@ defmodule Wasmtime do
     pid_ref |> :erlang.term_to_binary() |> Base.encode64()
   end
 
-  defp pidref_decode(hex) do
-    hex |> Base.decode64!() |> :erlang.binary_to_term()
+  defp func_imports_to_term(payload) do
+    imps = Map.get(payload, :imports)
+
+    Enum.reduce(Map.keys(imps), [], fn x, acc ->
+      [{x, Map.get(imps, x) |> elem(1), Map.get(imps, x) |> elem(2)} | acc]
+    end)
+    |> Enum.reverse()
+  end
+
+  @impl true
+  def handle_call({:func_call, fn_name, params}, from, payload) do
+    payload = Map.put(payload, from |> pidref_encode, from)
+
+    Native.func_call(
+      Map.get(payload, :id),
+      self(),
+      from |> pidref_encode(),
+      fn_name,
+      params,
+      params |> params_to_tys(),
+      payload |> func_imports_to_term
+    )
+
+    {:noreply, payload}
   end
 
   @impl true
@@ -92,7 +88,7 @@ defmodule Wasmtime do
     case payload do
       payload = %FromBytes{} ->
         Native.load_from(
-          payload.id,
+          Map.get(payload, :id),
           self(),
           from |> pidref_encode(),
           "",
@@ -102,7 +98,7 @@ defmodule Wasmtime do
 
       payload = %FromFile{} ->
         Native.load_from(
-          payload.id,
+          Map.get(payload, :id),
           self(),
           from |> pidref_encode(),
           payload.file_path,
@@ -130,13 +126,6 @@ defmodule Wasmtime do
       |> Map.get(id)
 
     Enum.zip([func_t |> elem(0) |> apply(params)], func_t |> elem(2))
-  end
-
-  defp invoke_import(payload, id, params) do
-    Map.get(payload, :imports)
-    |> Map.get(id)
-    |> elem(0)
-    |> apply(params)
   end
 
   defp _load(payload) do
@@ -180,5 +169,4 @@ defmodule Wasmtime do
     Native.exfn_reply(payload.id, id, invoke_import_res_ty(payload, id, params))
     {:noreply, payload}
   end
-
 end
