@@ -53,19 +53,17 @@ This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/da
 {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
 {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
 {:ok, {"plus_10", [:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
-{:ok, {"sum", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "sum")
 {:ok, {"min", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
 
 {:ok, [20]} = Wasmtime.call_func(pid, "add", [11, 9])
 {:ok, [30]} = Wasmtime.call_func(pid, "plus_10", [20])
-{:ok, [6]} = Wasmtime.call_func(pid, "sum", [0, 3])
 {:ok, [-10]} = Wasmtime.call_func(pid, "min", [-10, 3])
 ```
 
 ## Docs
 
 - [https://hexdocs.pm/wasmtime](https://hexdocs.pm/wasmtime)
-- If you're looking for more usage snippets, check out the [tests](./test/test_helper.exs) folder
+- If you're looking for more usage snippets, check out the [tests](./test/wasmtime_test.exs)
 
 ## Supported Wasm types
 
