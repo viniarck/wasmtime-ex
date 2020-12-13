@@ -47,10 +47,10 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_call({:func_call, fn_name, params}, from, payload) do
+  def handle_call({:call_func, fn_name, params}, from, payload) do
     payload = Map.put(payload, from |> pidref_encode, from)
 
-    Native.func_call(
+    Native.call_func(
       Map.get(payload, :id),
       self(),
       from |> pidref_encode(),
@@ -63,8 +63,8 @@ defmodule Wasmtime do
   end
 
   @impl true
-  def handle_call({:func_call_xt, fn_name, params}, _from, payload) do
-    {:reply, Native.func_call_xt(Map.get(payload, :id), fn_name, params), payload}
+  def handle_call({:call_func_xt, fn_name, params}, _from, payload) do
+    {:reply, Native.call_func_xt(Map.get(payload, :id), fn_name, params), payload}
   end
 
   @impl true
@@ -156,19 +156,19 @@ defmodule Wasmtime do
   @doc """
   Call a Wasm function.
   """
-  @spec func_call(pid(), String.t(), list()) :: {atom(), list()}
-  def func_call(pid, fn_name, params)
+  @spec call_func(pid(), String.t(), list()) :: {atom(), list()}
+  def call_func(pid, fn_name, params)
       when is_pid(pid) and is_bitstring(fn_name) and is_list(params) do
-    GenServer.call(pid, {:func_call, fn_name, params})
+    GenServer.call(pid, {:call_func, fn_name, params})
   end
 
   @doc """
   Call a Wasm function without using threads for specific low latency use cases. This function should only be used if you really have to save some extra microseconds, and the Wasm function is lightweight (takes less than < 1ms to execute). Also, the Wasm module can't have any imports when using this function.
   """
-  @spec func_call_xt(pid(), String.t(), list()) :: {atom(), list()}
-  def func_call_xt(pid, fn_name, params)
+  @spec call_func_xt(pid(), String.t(), list()) :: {atom(), list()}
+  def call_func_xt(pid, fn_name, params)
       when is_pid(pid) and is_bitstring(fn_name) and is_list(params) do
-    GenServer.call(pid, {:func_call_xt, fn_name, params})
+    GenServer.call(pid, {:call_func_xt, fn_name, params})
   end
 
   @doc """

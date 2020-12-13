@@ -25,8 +25,8 @@ rustler::rustler_export_nifs! {
     [
 
         ("load_from", 7, load_from),
-        ("func_call", 6, func_call, SchedulerFlags::DirtyCpu),
-        ("func_call_xt", 3, func_call_xt, SchedulerFlags::DirtyCpu),
+        ("call_func", 6, call_func, SchedulerFlags::DirtyCpu),
+        ("call_func_xt", 3, call_func_xt, SchedulerFlags::DirtyCpu),
         ("get_func", 3, get_func),
         ("exfn_reply", 3, exfn_reply, SchedulerFlags::DirtyCpu),
         ("exports", 2, exports),
@@ -127,7 +127,7 @@ fn imports_valtype_to_extern(
     _func_imports
 }
 
-fn func_call_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
+fn call_func_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: i64 = args[0].decode()?;
     let func_name: String = args[1].decode()?;
     let params: Vec<Term> = args[2].decode()?;
@@ -389,7 +389,7 @@ fn fn_imports_and_exports_tys(
     Ok((fn_imports, tys))
 }
 
-fn func_call<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
+fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: i64 = args[0].decode()?;
     let gen_pid: Pid = args[1].decode()?;
     let from_encoded: String = args[2].decode()?;

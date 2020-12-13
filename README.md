@@ -44,7 +44,7 @@ mod = ~S/
     ]
   })
 
-{:ok, [200]} = Wasmtime.func_call(pid, "run", [180])
+{:ok, [200]} = Wasmtime.call_func(pid, "run", [180])
 ```
 
 This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/data/wasmapp) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack):
@@ -56,10 +56,10 @@ This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/da
 {:ok, {"sum", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "sum")
 {:ok, {"min", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
 
-{:ok, [20]} = Wasmtime.func_call(pid, "add", [11, 9])
-{:ok, [30]} = Wasmtime.func_call(pid, "plus_10", [20])
-{:ok, [6]} = Wasmtime.func_call(pid, "sum", [0, 3])
-{:ok, [-10]} = Wasmtime.func_call(pid, "min", [-10, 3])
+{:ok, [20]} = Wasmtime.call_func(pid, "add", [11, 9])
+{:ok, [30]} = Wasmtime.call_func(pid, "plus_10", [20])
+{:ok, [6]} = Wasmtime.call_func(pid, "sum", [0, 3])
+{:ok, [-10]} = Wasmtime.call_func(pid, "min", [-10, 3])
 ```
 
 ## Docs
