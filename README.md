@@ -2,7 +2,7 @@
   <h1><code>wasmtime-ex</code></h1>
   <strong>💧Elixir WebAssembly runtime powered by <a href="https://github.com/bytecodealliance/wasmtime">Wasmtime 🦀</a></strong>
   <p></p>
-  ![.github/workflows/tests.yml](https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg) [![Hex](https://img.shields.io/hexpm/v/wasmtime.svg)](https://hex.pm/packages/wasmtime)
+  ![.github/workflows/tests.yml](https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg) ![Hex](https://img.shields.io/hexpm/v/wasmtime.svg)
 </div>
 
 ## Installation
@@ -45,7 +45,7 @@ mod = ~S/
 {:ok, [200]} = Wasmtime.func_call(pid, "run", [180])
 ```
 
-This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/data/wasmapp) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack). Wasmtime supports both `.wasm` and `.wat` file types:
+This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/data/wasmapp) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack):
 
 ```
 {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
