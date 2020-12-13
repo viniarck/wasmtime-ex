@@ -1,10 +1,9 @@
-![.github/workflows/tests.yml](https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg)[![Coverage Status](https://coveralls.io/repos/github/viniarck/wasmtime-ex/badge.svg?branch=develop)](https://coveralls.io/github/viniarck/wasmtime-ex?branch=develop)
-
-# wasmtime-ex
-
-![logo](https://lh3.googleusercontent.com/pw/ACtC-3cxbQiBP8tra3bdyBk0A1gqo8Ui5rVS-4sVjMdHRRaQxSphTH9FxIuP-O29EV4Vb0aAUvdsXv1gEX6PF5xGOBmCy4YWtt9WBVTS6YOsbeKCOJyU5HZh9kXC7thVEJDZYKN2j_ncTFcp-WvYtuLJQK87=w500-h300-no?authuser=0)
-
-Elixir WebAssembly runtime powered by Wasmtime
+<div align="center">
+  <h1><code>wasmtime-ex</code></h1>
+  <strong>💧Elixir WebAssembly runtime powered by <a href="https://github.com/bytecodealliance/wasmtime">Wasmtime 🦀</a></strong>
+  <p></p>
+  ![.github/workflows/tests.yml](https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg) [![Hex](https://img.shields.io/hexpm/v/wasmtime.svg)](https://hex.pm/packages/wasmtime)
+</div>
 
 ## Installation
 
@@ -46,18 +45,19 @@ mod = ~S/
 {:ok, [200]} = Wasmtime.func_call(pid, "run", [180])
 ```
 
-If you were to execute this code snippet, you'd see this message in the stdout:
+This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/data/wasmapp) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack). Wasmtime supports both `.wasm` and `.wat` file types:
 
 ```
-"Hello from Elixir! Got 180. Returning an i32 value"
-```
-
-The following example loads a Wasm module from the [adder.wat file](./test/data/adder.wat) (Wasmtime supports both .wasm and .wat file types). The exported function `add` is called with `[11, 9]`:
-
-```
-{:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
+{:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
 {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+{:ok, {"plus_10", [:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
+{:ok, {"sum", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "sum")
+{:ok, {"min", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
+
 {:ok, [20]} = Wasmtime.func_call(pid, "add", [11, 9])
+{:ok, [30]} = Wasmtime.func_call(pid, "plus_10", [20])
+{:ok, [6]} = Wasmtime.func_call(pid, "sum", [0, 3])
+{:ok, [-10]} = Wasmtime.func_call(pid, "min", [-10, 3])
 ```
 
 ## Docs
@@ -65,6 +65,8 @@ The following example loads a Wasm module from the [adder.wat file](./test/data/
 - [https://hexdocs.pm/wasmtime](https://hexdocs.pm/wasmtime)
 - If you're looking for more usage snippets, check out the [tests](./test/test_helper.exs) folder
 
-## Supported Wasm entities
+## Supported Wasm types
 
-Functions are supported with the four value types `i32`, `i64`, `f32` and `f64`. Memory will be supported soon. Globals and Tables are will be considered in the future.
+- Functions are supported with the four value types `i32`, `i64`, `f32` and `f64`
+- Memory will be supported soon
+- Globals and Tables are will be considered in the future

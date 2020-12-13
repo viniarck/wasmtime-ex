@@ -20,7 +20,7 @@ defmodule WasmtimeTest do
     {:ok, [^expected]} = Wasmtime.func_call(pid, "add", [a, b])
   end
 
-  test "load wat from file" do
+  test "load from wat file" do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
     {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
     {:ok, [20]} = Wasmtime.func_call(pid, "add", [11, 9])
@@ -39,6 +39,18 @@ defmodule WasmtimeTest do
     {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
     {:ok, {"add", [:i64, :i64], [:i64]}} = Wasmtime.get_func(pid, "add")
     {:ok, [8_589_934_593]} = Wasmtime.func_call(pid, "add", [8_589_934_592, 1])
+  end
+
+  test "load from wasm file" do
+    {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
+    {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+    {:ok, {"plus_10", [:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
+    {:ok, {"sum", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "sum")
+    {:ok, {"min", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
+    {:ok, [20]} = Wasmtime.func_call(pid, "add", [11, 9])
+    {:ok, [30]} = Wasmtime.func_call(pid, "plus_10", [20])
+    {:ok, [6]} = Wasmtime.func_call(pid, "sum", [0, 3])
+    {:ok, [-10]} = Wasmtime.func_call(pid, "min", [-10, 3])
   end
 
   test "func_call_xt add [:i64, :i64], [:i64]" do
