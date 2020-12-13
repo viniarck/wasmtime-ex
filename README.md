@@ -47,7 +47,7 @@ mod = ~S/
 {:ok, [200]} = Wasmtime.func_call(pid, "run", [180])
 ```
 
-This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/data/wasmapp) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack). Wasmtime supports both `.wasm` and `.wat` file types:
+This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/data/wasmapp) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack):
 
 ```
 {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
