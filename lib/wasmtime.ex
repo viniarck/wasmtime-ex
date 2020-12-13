@@ -60,6 +60,11 @@ defmodule Wasmtime do
   end
 
   @impl true
+  def handle_call({:func_call_xt, fn_name, params}, _from, payload) do
+    {:reply, Native.func_call_xt(Map.get(payload, :id), fn_name, params), payload}
+  end
+
+  @impl true
   def handle_call({:load_from}, from, payload) do
     payload = Map.put(payload, from |> pidref_encode, from)
 
@@ -126,6 +131,11 @@ defmodule Wasmtime do
   def func_call(pid, fn_name, params)
       when is_pid(pid) and is_bitstring(fn_name) and is_list(params) do
     GenServer.call(pid, {:func_call, fn_name, params})
+  end
+
+  def func_call_xt(pid, fn_name, params)
+      when is_pid(pid) and is_bitstring(fn_name) and is_list(params) do
+    GenServer.call(pid, {:func_call_xt, fn_name, params})
   end
 
   def exports(pid) when is_pid(pid) do

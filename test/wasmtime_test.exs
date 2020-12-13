@@ -23,6 +23,7 @@ defmodule WasmtimeTest do
   test "load wat from file" do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
     {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+    {:ok, [20]} = Wasmtime.func_call(pid, "add", [11, 9])
   end
 
   test "add [:i64, :i64], [:i64]" do
@@ -38,6 +39,19 @@ defmodule WasmtimeTest do
     {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
     {:ok, {"add", [:i64, :i64], [:i64]}} = Wasmtime.get_func(pid, "add")
     {:ok, [8_589_934_593]} = Wasmtime.func_call(pid, "add", [8_589_934_592, 1])
+  end
+
+  test "func_call_xt add [:i64, :i64], [:i64]" do
+    mod = ~S/
+    (module
+      (func (export "add") (param i64 i64) (result i64)
+        local.get 0
+        local.get 1
+        i64.add)
+    )
+    /
+    {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+    {:ok, [8_589_934_593]} = Wasmtime.func_call_xt(pid, "add", [8_589_934_592, 1])
   end
 
   test "add [:f32, :f32], [:f32]" do
@@ -97,6 +111,33 @@ defmodule WasmtimeTest do
       })
 
     {:ok, [200]} = Wasmtime.func_call(pid, "run", [180])
+  end
+
+  test "multiple import funcs" do
+    mod = ~S/
+    (module
+      (import "" "" (func $fcompute (param f32) (result f32)))
+      (import "" "" (func $icompute (param i32) (result i32)))
+      (func (export "runfc") (param f32) (result f32) (call $fcompute (local.get 0)))
+      (func (export "runic") (param i32) (result i32) (call $icompute (local.get 0)))
+    )
+    /
+
+    {:ok, pid} =
+      Wasmtime.load(%Wasmtime.FromBytes{
+        bytes: mod,
+        func_imports: [
+          {fn x ->
+             20.0 + x
+           end, [:f32], [:f32]},
+          {fn x ->
+             10 + x
+           end, [:i32], [:i32]}
+        ]
+      })
+
+    {:ok, [100.0]} = Wasmtime.func_call(pid, "runfc", [80.0])
+    {:ok, [32]} = Wasmtime.func_call(pid, "runic", [22])
   end
 
   test "func_call non existing function" do

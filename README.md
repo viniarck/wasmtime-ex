@@ -52,6 +52,19 @@ If you were to execute this code snippet, you'd see this message in the stdout:
 "Hello from Elixir! Got 180. Returning an i32 value"
 ```
 
+The following example loads a Wasm module from the [adder.wat file](./test/data/adder.wat) (Wasmtime supports both .wasm and .wat file types). The exported function `add` is called with `[11, 9]`:
+
+```
+{:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
+{:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+{:ok, [20]} = Wasmtime.func_call(pid, "add", [11, 9])
+```
+
 ## Docs
 
-[https://hexdocs.pm/wasmtime](https://hexdocs.pm/wasmtime).
+- [https://hexdocs.pm/wasmtime](https://hexdocs.pm/wasmtime)
+- If you're looking for more usage snippets, check out the [tests](./test/test_helper.exs) folder
+
+## Supported Wasm entities
+
+Functions are supported with the four value types `i32`, `i64`, `f32` and `f64`. Memory will be supported soon. Globals and Tables are will be considered in the future.
