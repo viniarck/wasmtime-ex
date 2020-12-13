@@ -3,11 +3,17 @@ defmodule Wasmtime.FromBytes do
   A struct representing a Wasm Instance from a bytes payload.
   """
 
-  @enforce_keys [:bytes]
-  defstruct bytes: nil, func_imports: []
+  alias Wasmtime.Config, as: Config
 
-  @typedoc "An Instance from bytes"
+  @enforce_keys [:bytes]
+  defstruct bytes: nil, func_imports: [], config: %Config{}
+
+  @typedoc """
+  Wasmtime.FromBytes
+  """
   @type t() :: %__MODULE__{
-          bytes: nonempty_charlist()
+          bytes: nonempty_charlist(),
+          func_imports: list(),
+          config: %Config{}
         }
 end

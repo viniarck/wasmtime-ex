@@ -68,6 +68,8 @@ defmodule Wasmtime do
   def handle_call({:load_from}, from, payload) do
     payload = Map.put(payload, from |> pidref_encode, from)
 
+    {:ok, config_encoded} = payload.config |> Jason.encode()
+
     case payload do
       payload = %FromBytes{} ->
         Native.load_from(
@@ -76,7 +78,8 @@ defmodule Wasmtime do
           from |> pidref_encode(),
           "",
           payload.bytes |> :binary.bin_to_list(),
-          payload |> func_imports_to_term
+          payload |> func_imports_to_term,
+          config_encoded
         )
 
       payload = %FromFile{} ->
@@ -86,7 +89,8 @@ defmodule Wasmtime do
           from |> pidref_encode(),
           payload.file_path,
           [],
-          payload |> func_imports_to_term
+          payload |> func_imports_to_term,
+          config_encoded
         )
     end
 
@@ -120,6 +124,12 @@ defmodule Wasmtime do
     end
   end
 
+  @doc """
+  Load a Wasm module given bytes in memory or from a Wasm file. Both `.wasm` and `.wat` files are supported.
+
+  iex> {:ok, _pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
+  """
+  @spec load(%FromBytes{} | %FromFile{}) :: {atom(), pid()}
   def load(payload = %FromBytes{}) do
     _load(payload)
   end

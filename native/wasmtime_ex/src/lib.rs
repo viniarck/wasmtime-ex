@@ -1,5 +1,6 @@
 pub mod atoms;
 pub mod session;
+pub mod config;
 
 use rustler::schedule::SchedulerFlags;
 use rustler::Error as RustlerError;
@@ -23,7 +24,7 @@ rustler::rustler_export_nifs! {
     "Elixir.Wasmtime.Native",
     [
 
-        ("load_from", 6, load_from),
+        ("load_from", 7, load_from),
         ("func_call", 6, func_call, SchedulerFlags::DirtyCpu),
         ("func_call_xt", 3, func_call_xt, SchedulerFlags::DirtyCpu),
         ("get_func", 3, get_func),
@@ -216,6 +217,30 @@ fn exfn_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerEr
             .encode(env))
     }
 }
+
+fn gen_config(config: &config::Config) -> Result<Config, Box<dyn Error>>{
+    let mut cfg = Config::new();
+    cfg.interruptable(config.interruptable);
+    cfg.debug_info(config.debug_info);
+    cfg.max_wasm_stack(config.max_wasm_stack);
+    let strategy = match &config.strategy {
+        x if x == "cranelift" => Strategy::Cranelift,
+        x if x == "lightbeam" => Strategy::Lightbeam,
+        _ => Strategy::Auto,
+    };
+    let cranelift_opt_level = match &config.cranelift_opt_level {
+        x if x == "speed" => OptLevel::Speed,
+        x if x == "speed_and_size" => OptLevel::SpeedAndSize,
+        _ => OptLevel::None,
+    };
+    cfg.cranelift_opt_level(cranelift_opt_level);
+    match cfg.strategy(strategy) {
+        Ok(_) => (),
+        Err(e) => return Err(e.into()),
+    };
+    Ok(cfg)
+}
+
 fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: i64 = args[0].decode()?;
     let gen_pid: Pid = args[1].decode()?;
@@ -223,6 +248,12 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     let file_name: String = args[3].decode()?;
     let bin: Vec<u8> = args[4].decode()?;
     let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[5].decode()?;
+    let config_val: String = args[6].decode()?;
+
+    let config: config::Config = match serde_json::from_str(&config_val) {
+        Ok(v) => v,
+        Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+    };
 
     let fn_imports = match imports_term_to_valtype(func_imports) {
         Ok(v) => v,
@@ -237,8 +268,14 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             array: &[u8],
             file_name: String,
             fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
+            config: &config::Config,
         ) -> Result<(), Box<dyn Error>> {
-            let store = Store::default();
+            let config = match gen_config(config) {
+                Ok(v) => v,
+                Err(e) => return Err(e.into()),
+            };
+            let engine = Engine::new(&config);
+            let store = Store::new(&engine);
             let mut msg_env = OwnedEnv::new();
 
             let module = if array.len() > 0 {
@@ -295,7 +332,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             Ok(())
         }
 
-        match run(tid, &gen_pid, &from_encoded, &bin, file_name, fn_imports) {
+        match run(tid, &gen_pid, &from_encoded, &bin, file_name, fn_imports, &config) {
             Ok(_) => (),
             Err(e) => {
                 let mut msg_env = OwnedEnv::new();
