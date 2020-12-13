@@ -1,6 +1,6 @@
 defmodule Wasmtime.FromBytes do
   @moduledoc """
-  A struct representing a Wasm Instance from a bytes payload.
+  A struct representing a Wasm instance from a bytes payload.
   """
 
   @enforce_keys [:bytes]

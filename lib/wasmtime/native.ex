@@ -1,6 +1,7 @@
 defmodule Wasmtime.Native do
   @moduledoc """
-  Documentation for `Wasmtime.Native.
+  Wasmtime NIFs. These functions aren't meant to be accessed directly by application
+  code. The Wasmtime module expose them through a GenServer.
   """
   use Rustler, otp_app: :wasmtime, crate: "wasmtime_ex"
 
