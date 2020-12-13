@@ -552,7 +552,7 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
                         }
                     };
                 }
-                return Ok((atoms::ok(), (func_name, params, results)).encode(env));
+                return Ok((atoms::ok(), (params, results)).encode(env));
             }
             None => {
                 return Ok((

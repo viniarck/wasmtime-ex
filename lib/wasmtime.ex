@@ -182,7 +182,7 @@ defmodule Wasmtime do
   @doc """
   Get an exported Wasm function.
   """
-  @spec get_func(pid(), String.t()) :: {atom(), list({String.t(), list(), list()})}
+  @spec get_func(pid(), String.t()) :: {atom(), list({list(), list()})}
   def get_func(pid, fn_name) when is_pid(pid) and is_bitstring(fn_name) do
     GenServer.call(pid, {:get_func, fn_name})
   end

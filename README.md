@@ -62,9 +62,9 @@ This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/da
 
 ```
 {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
-{:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
-{:ok, {"plus_10", [:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
-{:ok, {"min", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
+{:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+{:ok, {[:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
+{:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
 
 {:ok, [20]} = Wasmtime.call_func(pid, "add", [11, 9])
 {:ok, [30]} = Wasmtime.call_func(pid, "plus_10", [20])
