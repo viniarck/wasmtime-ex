@@ -1,10 +1,21 @@
 <div align="center">
   <h1><code>wasmtime-ex</code></h1>
+
   <strong>💧Elixir WebAssembly runtime powered by <a href="https://github.com/bytecodealliance/wasmtime">Wasmtime 🦀</a></strong>
+
   <p></p>
-  <a href="https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg"><img src="https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg" alt="tests" /></a>
-  <a href="https://img.shields.io/hexpm/v/wasmtime.svg"><img src="https://img.shields.io/hexpm/v/wasmtime.svg" alt="hex.pm version" /></a>
-  <a href="https://img.shields.io/hexpm/v/wasmtime.svg"><img src="https://img.shields.io/hexpm/dt/wasmtime.svg" alt="hex.pm downloads" /></a>
+  <p>
+    <a href="https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg"><img src="https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg" alt="tests" /></a>
+    <a href="https://img.shields.io/hexpm/v/wasmtime.svg"><img src="https://img.shields.io/hexpm/v/wasmtime.svg" alt="hex.pm version" /></a>
+    <a href="https://img.shields.io/hexpm/v/wasmtime.svg"><img src="https://img.shields.io/hexpm/dt/wasmtime.svg" alt="hex.pm downloads" /></a>
+  </p>
+
+
+  <h3>
+    <a href="https://hexdocs.pm/wasmtime">Docs</a>
+  </h3>
+
+  <!-- this html was based on https://github.com/bytecodealliance/wasmtime -->
 </div>
 
 ## Installation
@@ -51,19 +62,16 @@ This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/da
 
 ```
 {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
-{:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
-{:ok, {"plus_10", [:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
-{:ok, {"min", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
+{:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+{:ok, {[:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
+{:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
 
 {:ok, [20]} = Wasmtime.call_func(pid, "add", [11, 9])
 {:ok, [30]} = Wasmtime.call_func(pid, "plus_10", [20])
 {:ok, [-10]} = Wasmtime.call_func(pid, "min", [-10, 3])
 ```
 
-## Docs
-
-- [https://hexdocs.pm/wasmtime](https://hexdocs.pm/wasmtime)
-- If you're looking for more usage snippets, check out the [tests](./test/wasmtime_test.exs)
+If you want to see more usage examples, check [this test file](./test/wasmtime_test.exs) out.
 
 ## Supported Wasm types
 

@@ -12,8 +12,8 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
-    {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+    {:ok, [{"add", :func}]} = Wasmtime.exports(pid)
+    {:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
     a = 6
     b = 4
     expected = a + b
@@ -46,7 +46,7 @@ defmodule WasmtimeTest do
 
   test "load from wat file" do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
-    {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+    {:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
     {:ok, [20]} = Wasmtime.call_func(pid, "add", [11, 9])
   end
 
@@ -60,8 +60,8 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
-    {:ok, {"add", [:i64, :i64], [:i64]}} = Wasmtime.get_func(pid, "add")
+    {:ok, [{"add", :func}]} = Wasmtime.exports(pid)
+    {:ok, {[:i64, :i64], [:i64]}} = Wasmtime.get_func(pid, "add")
     {:ok, [8_589_934_593]} = Wasmtime.call_func(pid, "add", [8_589_934_592, 1])
   end
 
@@ -77,7 +77,7 @@ defmodule WasmtimeTest do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
 
     stream =
-      Task.async_stream(1..50, fn x ->
+      Task.async_stream(1..50, fn _ ->
         Wasmtime.call_func(pid, "add", [10, 5])
       end)
 
@@ -87,10 +87,10 @@ defmodule WasmtimeTest do
 
   test "load from wasm file" do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
-    {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
-    {:ok, {"plus_10", [:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
-    {:ok, {"sum", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "sum")
-    {:ok, {"min", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
+    {:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+    {:ok, {[:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
+    {:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "sum")
+    {:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
     {:ok, [20]} = Wasmtime.call_func(pid, "add", [11, 9])
     {:ok, [30]} = Wasmtime.call_func(pid, "plus_10", [20])
     {:ok, [6]} = Wasmtime.call_func(pid, "sum", [0, 3])
@@ -120,8 +120,8 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
-    {:ok, {"add", [:f32, :f32], [:f32]}} = Wasmtime.get_func(pid, "add")
+    {:ok, [{"add", :func}]} = Wasmtime.exports(pid)
+    {:ok, {[:f32, :f32], [:f32]}} = Wasmtime.get_func(pid, "add")
     a = 2.1
     b = 1.3
     expected = Float.round(a + b, 5)
@@ -139,8 +139,8 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
-    {:ok, {"add", [:f64, :f64], [:f64]}} = Wasmtime.get_func(pid, "add")
+    {:ok, [{"add", :func}]} = Wasmtime.exports(pid)
+    {:ok, {[:f64, :f64], [:f64]}} = Wasmtime.get_func(pid, "add")
     a = 2.1
     b = 1.3
     expected = Float.round(a + b, 5)
@@ -219,7 +219,7 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
+    {:ok, {[:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
   end
 
   test "get_func not found" do
@@ -249,5 +249,27 @@ defmodule WasmtimeTest do
 
     {:error, "Wasmtime.load(payload) hasn't been called yet"} =
       Wasmtime.call_func(pid, "non_existing", [1])
+  end
+
+  test "load wat memory type" do
+    mod = ~S/
+    (module
+      (memory (export "memory") 2 3)
+
+      (func (export "size") (result i32) (memory.size))
+      (func (export "load") (param i32) (result i32)
+        (i32.load8_s (local.get 0))
+      )
+      (func (export "store") (param i32 i32)
+        (i32.store8 (local.get 0) (local.get 1))
+      )
+
+      (data (i32.const 0x1000) "\01\02\03\04")
+    )
+    /
+    {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+
+    {:ok, [{"memory", :memory}, {"size", :func}, {"load", :func}, {"store", :func}]} =
+      Wasmtime.exports(pid)
   end
 end

@@ -552,7 +552,7 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
                         }
                     };
                 }
-                return Ok((atoms::ok(), (func_name, params, results)).encode(env));
+                return Ok((atoms::ok(), (params, results)).encode(env));
             }
             None => {
                 return Ok((
@@ -592,16 +592,16 @@ fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError
         for v in instance.exports() {
             match v.ty() {
                 ExternType::Func(_) => {
-                    _exports.push((v.name(), atoms::func_type().encode(env)));
+                    _exports.push((v.name(), atoms::func().encode(env)));
                 }
                 ExternType::Global(_) => {
-                    _exports.push((v.name(), atoms::global_type().encode(env)));
+                    _exports.push((v.name(), atoms::global().encode(env)));
                 }
                 ExternType::Table(_) => {
-                    _exports.push((v.name(), atoms::table_type().encode(env)));
+                    _exports.push((v.name(), atoms::table().encode(env)));
                 }
                 ExternType::Memory(_) => {
-                    _exports.push((v.name(), atoms::memory_type().encode(env)));
+                    _exports.push((v.name(), atoms::memory().encode(env)));
                 }
             };
         }

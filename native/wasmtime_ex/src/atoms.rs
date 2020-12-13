@@ -10,10 +10,10 @@ rustler::rustler_atoms! {
     atom extern_ref;
     atom func_ref;
 
-    atom func_type;
-    atom global_type;
-    atom table_type;
-    atom memory_type;
+    atom func;
+    atom global;
+    atom table;
+    atom memory;
     atom call_exfn;
     atom gen_reply;
 }
