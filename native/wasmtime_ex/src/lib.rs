@@ -25,6 +25,7 @@ rustler::rustler_export_nifs! {
 
         ("load_from", 6, load_from),
         ("func_call", 6, func_call, SchedulerFlags::DirtyCpu),
+        ("func_call_xt", 3, func_call_xt, SchedulerFlags::DirtyCpu),
         ("get_func", 3, get_func),
         ("exfn_reply", 3, exfn_reply, SchedulerFlags::DirtyCpu),
         ("exports", 2, exports),
@@ -76,10 +77,7 @@ fn imports_valtype_to_extern_recv(
                 let recv = fch.1.clone();
                 let fun: Extern = Func::new(
                     &store,
-                    FuncType::new(
-                        func_params.into_iter(),
-                        func_results.into_iter(),
-                    ),
+                    FuncType::new(func_params.into_iter(), func_results.into_iter()),
                     move |_, params, _results| {
                         let mut values: Vec<SVal> = Vec::new();
                         for v in params.iter() {
@@ -119,16 +117,80 @@ fn imports_valtype_to_extern(
     for (_, func_params, func_results) in fn_imports {
         let fun: Extern = Func::new(
             &store,
-            FuncType::new(
-                func_params.into_iter(),
-                func_results.into_iter(),
-            ),
+            FuncType::new(func_params.into_iter(), func_results.into_iter()),
             move |_, _, _| Ok(()),
         )
         .into();
         _func_imports.push(fun);
     }
     _func_imports
+}
+
+fn func_call_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
+    let tid: i64 = args[0].decode()?;
+    let func_name: String = args[1].decode()?;
+    let params: Vec<Term> = args[2].decode()?;
+
+    if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
+        let store = Store::new(session.module.engine());
+        let instance = match Instance::new(&store, &session.module, &[]) {
+            Ok(v) => v,
+            Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+        };
+
+        match instance.get_func(&func_name) {
+            Some(f) => {
+                let mut args: Vec<Val> = Vec::new();
+                for (i, v) in f.ty().params().enumerate() {
+                    match v {
+                        ValType::I32 => args.push(Val::I32(params.get(i).unwrap().decode()?)),
+                        ValType::I64 => args.push(Val::I64(params.get(i).unwrap().decode()?)),
+                        _ => (),
+                    }
+                }
+                let call_res = match f.call(&args) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Ok((atoms::error(), e.to_string()).encode(env));
+                    }
+                };
+
+                let mut results: Vec<Term> = Vec::new();
+                for (i, v) in f.ty().results().enumerate() {
+                    match v {
+                        ValType::I32 => {
+                            results.push((call_res.get(i).unwrap().unwrap_i32()).encode(env))
+                        }
+                        ValType::I64 => {
+                            results.push((call_res.get(i).unwrap().unwrap_i64()).encode(env))
+                        }
+                        ValType::F32 => {
+                            results.push((call_res.get(i).unwrap().unwrap_f32()).encode(env))
+                        }
+                        ValType::F64 => {
+                            results.push((call_res.get(i).unwrap().unwrap_f64()).encode(env))
+                        }
+                        _ => (),
+                    };
+                }
+
+                return Ok((atoms::ok(), results).encode(env));
+            }
+            None => {
+                return Ok((
+                    atoms::error(),
+                    std::format!("function {:?} not found", func_name),
+                )
+                    .encode(env))
+            }
+        };
+    } else {
+        Ok((
+            atoms::error(),
+            "Wasmtime.load(payload) hasn't been called yet",
+        )
+            .encode(env))
+    }
 }
 
 fn exfn_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
@@ -453,7 +515,7 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
                         }
                     };
                 }
-                return Ok((atoms::ok(), (func_name, params, results)).encode(env))
+                return Ok((atoms::ok(), (func_name, params, results)).encode(env));
             }
             None => {
                 return Ok((
@@ -526,12 +588,18 @@ fn values_to_sval(params: Vec<(Term, Atom)>) -> Result<Vec<SVal>, RustlerError> 
             x if *x == atoms::i64() => values.push(SVal {
                 v: Val::I64(param.decode()?),
             }),
-            x if *x == atoms::f32() => values.push(SVal {
-                v: Val::F32(param.decode()?),
-            }),
-            x if *x == atoms::f64() => values.push(SVal {
-                v: Val::F64(param.decode()?),
-            }),
+            x if *x == atoms::f32() => {
+                let v: f32 = param.decode()?;
+                values.push(SVal {
+                    v: Val::F32(v.to_bits()),
+                })
+            }
+            x if *x == atoms::f64() => {
+                let v: f64 = param.decode()?;
+                values.push(SVal {
+                    v: Val::F64(v.to_bits()),
+                })
+            }
             _ => (),
         };
     }
