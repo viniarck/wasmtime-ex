@@ -4,7 +4,7 @@ defmodule Wasmtime.MixProject do
   def project do
     [
       app: :wasmtime,
-      version: "0.1.0",
+      version: "0.2.0",
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
       compilers: [:rustler] ++ Mix.compilers(),
@@ -57,7 +57,10 @@ defmodule Wasmtime.MixProject do
         ~w(lib native/wasmtime_ex/src native/wasmtime_ex/Cargo* native/wasmtime_ex/.cargo .formatter.exs mix.exs README* LICENSE*
                 ),
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/viniarck/wasmtime-ex"}
+      links: %{
+        "GitHub" => "https://github.com/viniarck/wasmtime-ex",
+        "Docs" => "https://hexdocs.pm/wasmtime"
+      }
     ]
   end
 end

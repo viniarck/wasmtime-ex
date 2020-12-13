@@ -25,7 +25,7 @@ You can add `wasmtime` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:wasmtime, "~> 0.1.0"}
+    {:wasmtime, "~> 0.2.0"}
   ]
 end
 ```
@@ -58,7 +58,7 @@ mod = ~S/
 {:ok, [200]} = Wasmtime.call_func(pid, "run", [180])
 ```
 
-This next example loads a Wasm module from this [wasmapp_bg.wasm file](./test/data/wasmapp) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack):
+This next example loads a Wasm module from this [Rust lib.rs file](./test/data/wasmapp/src/lib.rs) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack):
 
 ```
 {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
