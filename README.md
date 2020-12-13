@@ -2,9 +2,9 @@
   <h1><code>wasmtime-ex</code></h1>
   <strong>💧Elixir WebAssembly runtime powered by <a href="https://github.com/bytecodealliance/wasmtime">Wasmtime 🦀</a></strong>
   <p></p>
-  ![.github/workflows/tests.yml](https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg)
-  [![Hex.pm](https://img.shields.io/hexpm/v/wasmtime.svg)]()
-  [![Hex.pm](https://img.shields.io/hexpm/dt/wasmtime.svg)]()
+  <a href="https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg"><img src="https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg" alt="tests" /></a>
+  <a href="https://img.shields.io/hexpm/v/wasmtime.svg"><img src="https://img.shields.io/hexpm/v/wasmtime.svg" alt="hex.pm version" /></a>
+  <a href="https://img.shields.io/hexpm/v/wasmtime.svg"><img src="https://img.shields.io/hexpm/dt/wasmtime.svg" alt="hex.pm downloads" /></a>
 </div>
 
 ## Installation
