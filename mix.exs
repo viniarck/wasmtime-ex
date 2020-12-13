@@ -44,6 +44,7 @@ defmodule Wasmtime.MixProject do
   defp deps do
     [
       {:rustler, "~> 0.21.1"},
+      {:jason, "~> 1.2.2"},
       {:excoveralls, "~> 0.13.2", only: :test},
       {:ex_doc, "~> 0.23", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev}
