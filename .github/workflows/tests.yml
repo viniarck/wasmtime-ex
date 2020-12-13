@@ -6,8 +6,11 @@ jobs:
     name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
     strategy:
       matrix:
-        otp: ['23.1']
-        elixir: ['1.11.0']
+        otp: ['23.1', '23.0']
+        elixir: ['1.11.0', '1.10.0']
+    env:
+      MIX_ENV: test
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-elixir@v1
@@ -15,4 +18,5 @@ jobs:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
       - run: mix deps.get
-      - run: mix test --trace
+      - run: mix coveralls --trace
+      - run: mix coveralls.github

@@ -1,4 +1,4 @@
-![.github/workflows/tests.yml](https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg)
+![.github/workflows/tests.yml](https://github.com/viniarck/wasmtime-ex/workflows/.github/workflows/tests.yml/badge.svg)[![Coverage Status](https://coveralls.io/repos/github/viniarck/wasmtime-ex/badge.svg?branch=develop)](https://coveralls.io/github/viniarck/wasmtime-ex?branch=develop)
 
 # wasmtime-ex
 
