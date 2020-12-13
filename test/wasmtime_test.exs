@@ -20,6 +20,30 @@ defmodule WasmtimeTest do
     {:ok, [^expected]} = Wasmtime.call_func(pid, "add", [a, b])
   end
 
+  test "load wat from bytes bad module arity" do
+    mod = ~S/
+    (module
+      (func (export "add") (param i32) (result i32)
+        local.get 0
+        local.get 1
+        i32.add)
+    )
+    /
+    {:error, "WebAssembly failed to compile"} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+  end
+
+  test "load wat from bytes bad formatted" do
+    mod = ~S/
+    (module
+      (func (export "add") param i32 i32) (result i32)
+        local.get 0
+        local.get 1
+        i32.add)
+    )
+    /
+    {:error, _} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+  end
+
   test "load from wat file" do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
     {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
@@ -39,6 +63,26 @@ defmodule WasmtimeTest do
     {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
     {:ok, {"add", [:i64, :i64], [:i64]}} = Wasmtime.get_func(pid, "add")
     {:ok, [8_589_934_593]} = Wasmtime.call_func(pid, "add", [8_589_934_592, 1])
+  end
+
+  test "add [:i64, :i64], [:i64] in parallel" do
+    mod = ~S/
+    (module
+      (func (export "add") (param i64 i64) (result i64)
+        local.get 0
+        local.get 1
+        i64.add)
+    )
+    /
+    {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+
+    stream =
+      Task.async_stream(1..50, fn x ->
+        Wasmtime.call_func(pid, "add", [10, 5])
+      end)
+
+    expected_res = 50 * (10 + 5)
+    ^expected_res = Enum.reduce(stream, 0, fn {:ok, {:ok, [num]}}, acc -> num + acc end)
   end
 
   test "load from wasm file" do
