@@ -17,6 +17,12 @@ defmodule Wasmtime.MixProject do
       description: "Elixir WebAssembly runtime powered by Wasmtime",
       package: package(),
       deps: deps(),
+      source_url: "https://github.com/viniarck/wasmtime-ex",
+      homepage_url: "https://github.com/viniarck/wasmtime-ex",
+      docs: [
+        main: "Wasmtime",
+        extras: ["README.md"]
+      ],
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: [
         coveralls: :test,
@@ -40,6 +46,7 @@ defmodule Wasmtime.MixProject do
       {:rustler, "~> 0.21.1"},
       {:jason, "~> 1.2.2"},
       {:excoveralls, "~> 0.13.2", only: :test},
+      {:ex_doc, "~> 0.23", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev}
     ]
   end
