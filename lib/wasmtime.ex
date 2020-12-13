@@ -1,6 +1,9 @@
 defmodule Wasmtime do
   @moduledoc """
-  Documentation for `Wasmtime`.
+  Represents a Wasm instance powered by Wasmtime. The module can be loaded via bytes
+  or a file path. Wasmtime will JIT compile, interpret and make it available. This
+  Elixir module is backed by a GenServer for concurrency reasons and to keep state
+  of the loaded instance.
   """
 
   use GenServer
@@ -103,6 +106,18 @@ defmodule Wasmtime do
     {:reply, Native.get_func(payload.id, fn_name, payload |> func_imports_to_term), payload}
   end
 
+  @impl true
+  def handle_info({:gen_reply, from, results}, payload) do
+    GenServer.reply(Map.get(payload, from), results)
+    {:noreply, Map.delete(payload, from)}
+  end
+
+  @impl true
+  def handle_info({:call_exfn, id, params}, payload) do
+    Native.exfn_reply(payload.id, id, invoke_import_res_ty(payload, id, params))
+    {:noreply, payload}
+  end
+
   defp invoke_import_res_ty(payload, id, params) do
     func_t =
       Map.get(payload, :imports)
@@ -120,6 +135,12 @@ defmodule Wasmtime do
     end
   end
 
+  @doc """
+  Load a Wasm module given bytes in memory or from a Wasm file. Both `.wasm` and `.wat` files are supported.
+
+  iex> {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
+  """
+  @spec load(%FromBytes{} | %FromFile{}) :: {atom(), pid()}
   def load(payload = %FromBytes{}) do
     _load(payload)
   end
@@ -128,33 +149,37 @@ defmodule Wasmtime do
     _load(payload)
   end
 
+  @doc """
+  Call a Wasm function.
+  """
+  @spec func_call(pid(), String.t(), list()) :: {atom(), list()}
   def func_call(pid, fn_name, params)
       when is_pid(pid) and is_bitstring(fn_name) and is_list(params) do
     GenServer.call(pid, {:func_call, fn_name, params})
   end
 
+  @doc """
+  Call a Wasm function without using threads for specific low latency use cases. This function should only be used if you really have to save some extra microseconds, and the Wasm function is lightweight (takes less than < 1ms to execute). Also, the Wasm module can't have any imports when using this function.
+  """
+  @spec func_call_xt(pid(), String.t(), list()) :: {atom(), list()}
   def func_call_xt(pid, fn_name, params)
       when is_pid(pid) and is_bitstring(fn_name) and is_list(params) do
     GenServer.call(pid, {:func_call_xt, fn_name, params})
   end
 
+  @doc """
+  List all Wasm types exported.
+  """
+  @spec exports(pid()) :: {atom(), list({String.t(), list(), list()})}
   def exports(pid) when is_pid(pid) do
     GenServer.call(pid, {:exports})
   end
 
+  @doc """
+  Get an exported Wasm function.
+  """
+  @spec get_func(pid(), String.t()) :: {atom(), list({String.t(), list(), list()})}
   def get_func(pid, fn_name) when is_pid(pid) and is_bitstring(fn_name) do
     GenServer.call(pid, {:get_func, fn_name})
-  end
-
-  @impl true
-  def handle_info({:gen_reply, from, results}, payload) do
-    GenServer.reply(Map.get(payload, from), results)
-    {:noreply, Map.delete(payload, from)}
-  end
-
-  @impl true
-  def handle_info({:call_exfn, id, params}, payload) do
-    Native.exfn_reply(payload.id, id, invoke_import_res_ty(payload, id, params))
-    {:noreply, payload}
   end
 end
