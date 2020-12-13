@@ -12,7 +12,7 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
+    {:ok, [{"add", :func}]} = Wasmtime.exports(pid)
     {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
     a = 6
     b = 4
@@ -60,7 +60,7 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
+    {:ok, [{"add", :func}]} = Wasmtime.exports(pid)
     {:ok, {"add", [:i64, :i64], [:i64]}} = Wasmtime.get_func(pid, "add")
     {:ok, [8_589_934_593]} = Wasmtime.call_func(pid, "add", [8_589_934_592, 1])
   end
@@ -120,7 +120,7 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
+    {:ok, [{"add", :func}]} = Wasmtime.exports(pid)
     {:ok, {"add", [:f32, :f32], [:f32]}} = Wasmtime.get_func(pid, "add")
     a = 2.1
     b = 1.3
@@ -139,7 +139,7 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
+    {:ok, [{"add", :func}]} = Wasmtime.exports(pid)
     {:ok, {"add", [:f64, :f64], [:f64]}} = Wasmtime.get_func(pid, "add")
     a = 2.1
     b = 1.3
@@ -269,8 +269,7 @@ defmodule WasmtimeTest do
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
 
-    {:ok,
-     [{"memory", :memory_type}, {"size", :func_type}, {"load", :func_type}, {"store", :func_type}]} =
+    {:ok, [{"memory", :memory}, {"size", :func}, {"load", :func}, {"store", :func}]} =
       Wasmtime.exports(pid)
   end
 end
