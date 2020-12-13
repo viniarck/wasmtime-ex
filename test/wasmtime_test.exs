@@ -17,13 +17,13 @@ defmodule WasmtimeTest do
     a = 6
     b = 4
     expected = a + b
-    {:ok, [^expected]} = Wasmtime.func_call(pid, "add", [a, b])
+    {:ok, [^expected]} = Wasmtime.call_func(pid, "add", [a, b])
   end
 
   test "load from wat file" do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/adder.wat"})
     {:ok, {"add", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "add")
-    {:ok, [20]} = Wasmtime.func_call(pid, "add", [11, 9])
+    {:ok, [20]} = Wasmtime.call_func(pid, "add", [11, 9])
   end
 
   test "add [:i64, :i64], [:i64]" do
@@ -38,7 +38,7 @@ defmodule WasmtimeTest do
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
     {:ok, [{"add", :func_type}]} = Wasmtime.exports(pid)
     {:ok, {"add", [:i64, :i64], [:i64]}} = Wasmtime.get_func(pid, "add")
-    {:ok, [8_589_934_593]} = Wasmtime.func_call(pid, "add", [8_589_934_592, 1])
+    {:ok, [8_589_934_593]} = Wasmtime.call_func(pid, "add", [8_589_934_592, 1])
   end
 
   test "load from wasm file" do
@@ -47,13 +47,13 @@ defmodule WasmtimeTest do
     {:ok, {"plus_10", [:i32], [:i32]}} = Wasmtime.get_func(pid, "plus_10")
     {:ok, {"sum", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "sum")
     {:ok, {"min", [:i32, :i32], [:i32]}} = Wasmtime.get_func(pid, "min")
-    {:ok, [20]} = Wasmtime.func_call(pid, "add", [11, 9])
-    {:ok, [30]} = Wasmtime.func_call(pid, "plus_10", [20])
-    {:ok, [6]} = Wasmtime.func_call(pid, "sum", [0, 3])
-    {:ok, [-10]} = Wasmtime.func_call(pid, "min", [-10, 3])
+    {:ok, [20]} = Wasmtime.call_func(pid, "add", [11, 9])
+    {:ok, [30]} = Wasmtime.call_func(pid, "plus_10", [20])
+    {:ok, [6]} = Wasmtime.call_func(pid, "sum", [0, 3])
+    {:ok, [-10]} = Wasmtime.call_func(pid, "min", [-10, 3])
   end
 
-  test "func_call_xt add [:i64, :i64], [:i64]" do
+  test "call_func_xt add [:i64, :i64], [:i64]" do
     mod = ~S/
     (module
       (func (export "add") (param i64 i64) (result i64)
@@ -63,7 +63,7 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:ok, [8_589_934_593]} = Wasmtime.func_call_xt(pid, "add", [8_589_934_592, 1])
+    {:ok, [8_589_934_593]} = Wasmtime.call_func_xt(pid, "add", [8_589_934_592, 1])
   end
 
   test "add [:f32, :f32], [:f32]" do
@@ -81,7 +81,7 @@ defmodule WasmtimeTest do
     a = 2.1
     b = 1.3
     expected = Float.round(a + b, 5)
-    {:ok, [result]} = Wasmtime.func_call(pid, "add", [a, b])
+    {:ok, [result]} = Wasmtime.call_func(pid, "add", [a, b])
     ^expected = Float.round(result, 5)
   end
 
@@ -100,7 +100,7 @@ defmodule WasmtimeTest do
     a = 2.1
     b = 1.3
     expected = Float.round(a + b, 5)
-    {:ok, [result]} = Wasmtime.func_call(pid, "add", [a, b])
+    {:ok, [result]} = Wasmtime.call_func(pid, "add", [a, b])
     ^expected = Float.round(result, 5)
   end
 
@@ -122,7 +122,7 @@ defmodule WasmtimeTest do
         ]
       })
 
-    {:ok, [200]} = Wasmtime.func_call(pid, "run", [180])
+    {:ok, [200]} = Wasmtime.call_func(pid, "run", [180])
   end
 
   test "multiple import funcs" do
@@ -148,11 +148,11 @@ defmodule WasmtimeTest do
         ]
       })
 
-    {:ok, [100.0]} = Wasmtime.func_call(pid, "runfc", [80.0])
-    {:ok, [32]} = Wasmtime.func_call(pid, "runic", [22])
+    {:ok, [100.0]} = Wasmtime.call_func(pid, "runfc", [80.0])
+    {:ok, [32]} = Wasmtime.call_func(pid, "runic", [22])
   end
 
-  test "func_call non existing function" do
+  test "call_func non existing function" do
     mod = ~S/
     (module
       (func (export "add") (param i32 i32) (result i32)
@@ -162,7 +162,7 @@ defmodule WasmtimeTest do
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
-    {:error, "function \"non_existing\" not found"} = Wasmtime.func_call(pid, "non_existing", [1])
+    {:error, "function \"non_existing\" not found"} = Wasmtime.call_func(pid, "non_existing", [1])
   end
 
   test "get_func" do
@@ -204,6 +204,6 @@ defmodule WasmtimeTest do
     {:ok, pid} = GenServer.start_link(Wasmtime, %Wasmtime.FromBytes{bytes: mod})
 
     {:error, "Wasmtime.load(payload) hasn't been called yet"} =
-      Wasmtime.func_call(pid, "non_existing", [1])
+      Wasmtime.call_func(pid, "non_existing", [1])
   end
 end
