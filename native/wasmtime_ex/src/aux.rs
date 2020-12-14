@@ -77,7 +77,7 @@ pub fn imports_valtype_to_extern_recv(
     fchs: &HashMap<i64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>,
     gen_pid: &Pid,
 ) -> Vec<Extern> {
-    let mut _func_imports: Vec<Extern> = Vec::new();
+    let mut _func_imports: Vec<Extern> = Vec::with_capacity(fn_imports.len());
     for (func_id, func_params, func_results) in fn_imports {
         match fchs.get(&func_id) {
             Some(fch) => {
