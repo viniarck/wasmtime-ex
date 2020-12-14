@@ -27,9 +27,10 @@ pub fn imports_valtype_to_extern(
 }
 
 pub fn imports_term_to_valtype(
-    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>,
+    func_imports: &Vec<(i64, Vec<Atom>, Vec<Atom>)>
 ) -> Result<Vec<(i64, Vec<ValType>, Vec<ValType>)>, Box<dyn Error>> {
-    let mut fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)> = Vec::new();
+    let mut fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)> =
+        Vec::with_capacity(func_imports.len());
     for (f_id, params, results) in func_imports.iter() {
         let mut par: Vec<ValType> = Vec::new();
         let mut res: Vec<ValType> = Vec::new();
@@ -138,7 +139,7 @@ fn func_param_tys(tid: i64, func_name: String) -> Result<Vec<ValType>, Box<dyn E
 pub fn fn_imports_and_exports_tys(
     tid: i64,
     func_name: String,
-    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>,
+    func_imports: &Vec<(i64, Vec<Atom>, Vec<Atom>)>,
 ) -> Result<(Vec<(i64, Vec<ValType>, Vec<ValType>)>, Vec<ValType>), Box<dyn Error>> {
     let fn_imports = match imports_term_to_valtype(func_imports) {
         Ok(v) => v,

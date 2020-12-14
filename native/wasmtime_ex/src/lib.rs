@@ -134,7 +134,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
         Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
     };
 
-    let fn_imports = match aux::imports_term_to_valtype(func_imports) {
+    let fn_imports = match aux::imports_term_to_valtype(&func_imports) {
         Ok(v) => v,
         Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
     };
@@ -195,7 +195,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             let mut fchs: HashMap<
                 i64,
                 (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>),
-            > = HashMap::new();
+            > = HashMap::with_capacity(func_ids.len());
             for func_id in func_ids {
                 let fch: (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>) =
                     unbounded();
@@ -246,7 +246,7 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[5].decode()?;
 
     let (fn_imports, tys) =
-        match aux::fn_imports_and_exports_tys(tid, func_name.clone(), func_imports) {
+        match aux::fn_imports_and_exports_tys(tid, func_name.clone(), &func_imports) {
             Ok(v) => v,
             Err(e) => {
                 env.send(
@@ -361,7 +361,7 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
-        let fn_imports = match aux::imports_term_to_valtype(func_imports) {
+        let fn_imports = match aux::imports_term_to_valtype(&func_imports) {
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         };
@@ -426,7 +426,7 @@ fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
-        let fn_imports = match aux::imports_term_to_valtype(func_imports) {
+        let fn_imports = match aux::imports_term_to_valtype(&func_imports) {
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         };
