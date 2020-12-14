@@ -56,7 +56,7 @@ mod = ~S/
 {:ok, [200]} = Wasmtime.call_func(pid, "run", [180])
 ```
 
-This next example loads a Wasm module from this [Rust lib.rs file](./test/data/wasmapp/src/lib.rs) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack):
+This next example loads a Wasm module from this [rust lib.rs file](./test/data/wasmapp/src/lib.rs) that's been built with [wasm-pack](https://github.com/rustwasm/wasm-pack):
 
 ```
 {:ok, pid} = Wasmtime.load(%Wasmtime.FromFile{file_path: "test/data/wasmapp/wasmapp_bg.wasm"})
@@ -70,6 +70,36 @@ This next example loads a Wasm module from this [Rust lib.rs file](./test/data/w
 ```
 
 If you want to see more usage examples, check [this test file](./test/wasmtime_test.exs) out.
+
+## Benchmark
+
+Wasmtime is really fast. Here's a benchmark with [these simple functions](./test/bench/bench.exs), running on my computer, for a reference:
+
+```
+Compiling NIF crate :wasmtime_ex (native/wasmtime_ex)...
+    Finished release [optimized] target(s) in 0.07s
+Operating System: Linux
+CPU Information: Intel(R) Core(TM) i7-4720HQ CPU @ 2.60GHz
+Number of Available Cores: 8
+Available memory: 31.25 GB
+Elixir 1.11.0
+Erlang 23.1.1
+
+Benchmark suite executing with the following configuration:
+warmup: 20 s
+time: 1 min
+memory time: 0 ns
+parallel: 1
+inputs: none specified
+Estimated total run time: 6.67 min
+
+Name                 ips        average  deviation         median         99th %
+add_xt          140.22 K        7.13 μs   ±461.08%        6.94 μs       11.20 μs
+plus_10_xt      134.72 K        7.42 μs   ±443.67%        7.21 μs       11.29 μs
+add              21.75 K       45.98 μs    ±52.83%       42.90 μs       83.64 μs
+plus_10          19.78 K       50.55 μs    ±47.20%       46.26 μs       91.51 μs
+imports           4.28 K      233.76 μs    ±20.80%      230.13 μs      332.01 μs
+```
 
 ## Supported Wasm types
 
