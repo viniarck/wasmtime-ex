@@ -100,7 +100,7 @@ fn exfn_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerEr
     let tid: i64 = args[0].decode()?;
     let func_id: i64 = args[1].decode()?;
     let results: Vec<(Term, Atom)> = args[2].decode()?;
-    let results = aux::values_to_sval(results)?;
+    let results = aux::args_to_svals(results)?;
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         if let Some(fch) = session.fchs.get(&func_id) {
@@ -261,7 +261,7 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                 return Ok((atoms::ok()).encode(env));
             }
         };
-    let svals = aux::params_ty_sval_vec(&params, &tys)?;
+    let svals = aux::args_ty_to_svals(&params, &tys)?;
 
     thread::spawn(move || {
         fn run(

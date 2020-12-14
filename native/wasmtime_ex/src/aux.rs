@@ -156,12 +156,12 @@ pub fn imports_with_exports_tys(
     Ok((fn_imports, tys))
 }
 
-pub fn params_ty_sval_vec(
-    params: &Vec<Term>,
+pub fn args_ty_to_svals(
+    args: &Vec<Term>,
     tys: &Vec<ValType>,
 ) -> Result<Vec<SVal>, RustlerError> {
     let mut values: Vec<SVal> = Vec::new();
-    for (param, ty) in params.iter().zip(tys) {
+    for (param, ty) in args.iter().zip(tys) {
         match ty {
             ValType::I32 => values.push(SVal {
                 v: Val::I32(param.decode()?),
@@ -187,24 +187,24 @@ pub fn params_ty_sval_vec(
     Ok(values)
 }
 
-pub fn values_to_sval(params: Vec<(Term, Atom)>) -> Result<Vec<SVal>, RustlerError> {
+pub fn args_to_svals(args: Vec<(Term, Atom)>) -> Result<Vec<SVal>, RustlerError> {
     let mut values: Vec<SVal> = Vec::new();
-    for (param, ty) in params.iter() {
+    for (arg, ty) in args.iter() {
         match ty {
             x if *x == atoms::i32() => values.push(SVal {
-                v: Val::I32(param.decode()?),
+                v: Val::I32(arg.decode()?),
             }),
             x if *x == atoms::i64() => values.push(SVal {
-                v: Val::I64(param.decode()?),
+                v: Val::I64(arg.decode()?),
             }),
             x if *x == atoms::f32() => {
-                let v: f32 = param.decode()?;
+                let v: f32 = arg.decode()?;
                 values.push(SVal {
                     v: Val::F32(v.to_bits()),
                 })
             }
             x if *x == atoms::f64() => {
-                let v: f64 = param.decode()?;
+                let v: f64 = arg.decode()?;
                 values.push(SVal {
                     v: Val::F64(v.to_bits()),
                 })
