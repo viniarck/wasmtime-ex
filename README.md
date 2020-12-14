@@ -30,8 +30,6 @@ def deps do
 end
 ```
 
-This package is still under heavy development, I'd recommend you to wait for the `0.2.0` release since the core API might still change, feel free to explore it in the meantime. Enjoy!
-
 ## Usage
 
 In this example, the Wasm module is compiled, instantiated and a host function is called and imported from Elixir:
