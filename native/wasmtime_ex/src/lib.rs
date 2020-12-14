@@ -1,24 +1,19 @@
 pub mod atoms;
-pub mod session;
+pub mod aux;
 pub mod config;
+pub mod session;
 
 use rustler::schedule::SchedulerFlags;
 use rustler::Error as RustlerError;
 use rustler::{Atom, Encoder, Env, OwnedEnv, Pid, Term};
 
-use crate::session::{SVal, SValType, Session};
+use crate::session::{SVal, SValType, Session, SESSIONS};
 use crossbeam::channel::unbounded;
-use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::RwLock;
 use std::thread;
 use wasmtime::Val;
 use wasmtime::*;
-
-lazy_static! {
-    static ref SESSIONS: RwLock<HashMap<i64, Box<Session>>> = RwLock::new(HashMap::new());
-}
 
 rustler::rustler_export_nifs! {
     "Elixir.Wasmtime.Native",
@@ -32,99 +27,6 @@ rustler::rustler_export_nifs! {
         ("exports", 2, exports),
     ],
     None
-}
-
-fn imports_term_to_valtype(
-    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>,
-) -> Result<Vec<(i64, Vec<ValType>, Vec<ValType>)>, Box<dyn Error>> {
-    let mut fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)> = Vec::new();
-    for (f_id, params, results) in func_imports.iter() {
-        let mut par: Vec<ValType> = Vec::new();
-        let mut res: Vec<ValType> = Vec::new();
-        for p in params {
-            match p {
-                x if *x == atoms::i32() => par.push(ValType::I32),
-                x if *x == atoms::i64() => par.push(ValType::I64),
-                x if *x == atoms::f32() => par.push(ValType::F32),
-                x if *x == atoms::f64() => par.push(ValType::F64),
-                x => return Err(std::format!("ValType not supported yet: {:?}", x).into()),
-            }
-        }
-        for r in results {
-            match r {
-                x if *x == atoms::i32() => res.push(ValType::I32),
-                x if *x == atoms::i64() => res.push(ValType::I64),
-                x if *x == atoms::f32() => res.push(ValType::F32),
-                x if *x == atoms::f64() => res.push(ValType::F64),
-                x => return Err(std::format!("ValType not supported yet: {:?}", x).into()),
-            }
-        }
-        fn_imports.push((*f_id, par, res));
-    }
-    Ok(fn_imports)
-}
-
-fn imports_valtype_to_extern_recv(
-    fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
-    store: &Store,
-    fchs: &HashMap<i64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>,
-    gen_pid: &Pid,
-) -> Vec<Extern> {
-    let mut _func_imports: Vec<Extern> = Vec::new();
-    for (func_id, func_params, func_results) in fn_imports {
-        match fchs.get(&func_id) {
-            Some(fch) => {
-                let pid = gen_pid.clone();
-                let recv = fch.1.clone();
-                let fun: Extern = Func::new(
-                    &store,
-                    FuncType::new(func_params.into_iter(), func_results.into_iter()),
-                    move |_, params, _results| {
-                        let mut values: Vec<SVal> = Vec::new();
-                        for v in params.iter() {
-                            match v {
-                                Val::I32(k) => values.push(SVal { v: Val::I32(*k) }),
-                                Val::I64(k) => values.push(SVal { v: Val::I64(*k) }),
-                                Val::F32(k) => values.push(SVal { v: Val::F32(*k) }),
-                                Val::F64(k) => values.push(SVal { v: Val::F64(*k) }),
-                                _ => (),
-                            }
-                        }
-                        let mut msg_env = OwnedEnv::new();
-                        msg_env.send_and_clear(&pid, |env| {
-                            (atoms::call_exfn(), func_id, sval_vec_to_term(env, values)).encode(env)
-                        });
-                        for (i, result) in recv.recv().unwrap().iter().enumerate() {
-                            _results[i] = result.v.clone();
-                        }
-                        Ok(())
-                    },
-                )
-                .into();
-                _func_imports.push(fun);
-                ()
-            }
-            None => (),
-        };
-    }
-    _func_imports
-}
-
-fn imports_valtype_to_extern(
-    fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
-    store: &Store,
-) -> Vec<Extern> {
-    let mut _func_imports: Vec<Extern> = Vec::new();
-    for (_, func_params, func_results) in fn_imports {
-        let fun: Extern = Func::new(
-            &store,
-            FuncType::new(func_params.into_iter(), func_results.into_iter()),
-            move |_, _, _| Ok(()),
-        )
-        .into();
-        _func_imports.push(fun);
-    }
-    _func_imports
 }
 
 fn call_func_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
@@ -198,7 +100,7 @@ fn exfn_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerEr
     let tid: i64 = args[0].decode()?;
     let func_id: i64 = args[1].decode()?;
     let results: Vec<(Term, Atom)> = args[2].decode()?;
-    let results = values_to_sval(results)?;
+    let results = aux::values_to_sval(results)?;
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         if let Some(fch) = session.fchs.get(&func_id) {
@@ -218,29 +120,6 @@ fn exfn_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerEr
     }
 }
 
-fn gen_config(config: &config::Config) -> Result<Config, Box<dyn Error>>{
-    let mut cfg = Config::new();
-    cfg.interruptable(config.interruptable);
-    cfg.debug_info(config.debug_info);
-    cfg.max_wasm_stack(config.max_wasm_stack);
-    let strategy = match &config.strategy {
-        x if x == "cranelift" => Strategy::Cranelift,
-        x if x == "lightbeam" => Strategy::Lightbeam,
-        _ => Strategy::Auto,
-    };
-    let cranelift_opt_level = match &config.cranelift_opt_level {
-        x if x == "speed" => OptLevel::Speed,
-        x if x == "speed_and_size" => OptLevel::SpeedAndSize,
-        _ => OptLevel::None,
-    };
-    cfg.cranelift_opt_level(cranelift_opt_level);
-    match cfg.strategy(strategy) {
-        Ok(_) => (),
-        Err(e) => return Err(e.into()),
-    };
-    Ok(cfg)
-}
-
 fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: i64 = args[0].decode()?;
     let gen_pid: Pid = args[1].decode()?;
@@ -255,7 +134,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
         Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
     };
 
-    let fn_imports = match imports_term_to_valtype(func_imports) {
+    let fn_imports = match aux::imports_term_to_valtype(func_imports) {
         Ok(v) => v,
         Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
     };
@@ -270,7 +149,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
             config: &config::Config,
         ) -> Result<(), Box<dyn Error>> {
-            let config = match gen_config(config) {
+            let config = match aux::gen_config(config) {
                 Ok(v) => v,
                 Err(e) => return Err(e.into()),
             };
@@ -292,7 +171,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
 
             let store = Store::new(module.engine());
             let func_ids: Vec<i64> = fn_imports.iter().map(|x| x.0).collect();
-            let func_imports = imports_valtype_to_extern(fn_imports, &store);
+            let func_imports = aux::imports_valtype_to_extern(fn_imports, &store);
 
             let instance = match Instance::new(&store, &module, &*func_imports.into_boxed_slice()) {
                 Ok(v) => v,
@@ -332,7 +211,15 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             Ok(())
         }
 
-        match run(tid, &gen_pid, &from_encoded, &bin, file_name, fn_imports, &config) {
+        match run(
+            tid,
+            &gen_pid,
+            &from_encoded,
+            &bin,
+            file_name,
+            fn_imports,
+            &config,
+        ) {
             Ok(_) => (),
             Err(e) => {
                 let mut msg_env = OwnedEnv::new();
@@ -350,45 +237,6 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     Ok((atoms::ok()).encode(env))
 }
 
-fn func_param_tys(tid: i64, func_name: String) -> Result<Vec<ValType>, Box<dyn Error>> {
-    let mut tys: Vec<ValType> = Vec::new();
-    if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
-        match session.exports.get(&func_name) {
-            Some(v) => {
-                for val in v.iter() {
-                    tys.push(val.ty.clone());
-                }
-            }
-            None => {
-                return Err(std::format!("function {:?} not found", func_name).into());
-            }
-        };
-        Ok(tys)
-    } else {
-        Err("Wasmtime.load(payload) hasn't been called yet".into())
-    }
-}
-
-fn fn_imports_and_exports_tys(
-    tid: i64,
-    func_name: String,
-    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>,
-) -> Result<(Vec<(i64, Vec<ValType>, Vec<ValType>)>, Vec<ValType>), Box<dyn Error>> {
-    let fn_imports = match imports_term_to_valtype(func_imports) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(e.to_string().into());
-        }
-    };
-    let tys = match func_param_tys(tid, func_name.clone()) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(e.to_string().into());
-        }
-    };
-    Ok((fn_imports, tys))
-}
-
 fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: i64 = args[0].decode()?;
     let gen_pid: Pid = args[1].decode()?;
@@ -397,22 +245,23 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     let params: Vec<Term> = args[4].decode()?;
     let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[5].decode()?;
 
-    let (fn_imports, tys) = match fn_imports_and_exports_tys(tid, func_name.clone(), func_imports) {
-        Ok(v) => v,
-        Err(e) => {
-            env.send(
-                &gen_pid,
-                (
-                    atoms::gen_reply(),
-                    from_encoded,
-                    (atoms::error(), e.to_string()),
-                )
-                    .encode(env),
-            );
-            return Ok((atoms::ok()).encode(env));
-        }
-    };
-    let svals = params_ty_sval_vec(&params, &tys)?;
+    let (fn_imports, tys) =
+        match aux::fn_imports_and_exports_tys(tid, func_name.clone(), func_imports) {
+            Ok(v) => v,
+            Err(e) => {
+                env.send(
+                    &gen_pid,
+                    (
+                        atoms::gen_reply(),
+                        from_encoded,
+                        (atoms::error(), e.to_string()),
+                    )
+                        .encode(env),
+                );
+                return Ok((atoms::ok()).encode(env));
+            }
+        };
+    let svals = aux::params_ty_sval_vec(&params, &tys)?;
 
     thread::spawn(move || {
         fn run(
@@ -425,7 +274,7 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
         ) -> Result<(), Box<dyn Error>> {
             if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
                 let store = Store::new(session.module.engine());
-                let func_imports = imports_valtype_to_extern_recv(
+                let func_imports = aux::imports_valtype_to_extern_recv(
                     fn_imports,
                     &store,
                     &session.fchs,
@@ -512,11 +361,11 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
-        let fn_imports = match imports_term_to_valtype(func_imports) {
+        let fn_imports = match aux::imports_term_to_valtype(func_imports) {
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         };
-        let fn_imports = imports_valtype_to_extern(fn_imports, &store);
+        let fn_imports = aux::imports_valtype_to_extern(fn_imports, &store);
         let instance = match Instance::new(&store, &session.module, &*fn_imports.into_boxed_slice())
         {
             Ok(v) => v,
@@ -577,11 +426,11 @@ fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
-        let fn_imports = match imports_term_to_valtype(func_imports) {
+        let fn_imports = match aux::imports_term_to_valtype(func_imports) {
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         };
-        let fn_imports = imports_valtype_to_extern(fn_imports, &store);
+        let fn_imports = aux::imports_valtype_to_extern(fn_imports, &store);
         let instance = match Instance::new(&store, &session.module, &*fn_imports.into_boxed_slice())
         {
             Ok(v) => v,
@@ -613,74 +462,4 @@ fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError
         )
             .encode(env))
     }
-}
-
-fn values_to_sval(params: Vec<(Term, Atom)>) -> Result<Vec<SVal>, RustlerError> {
-    let mut values: Vec<SVal> = Vec::new();
-    for (param, ty) in params.iter() {
-        match ty {
-            x if *x == atoms::i32() => values.push(SVal {
-                v: Val::I32(param.decode()?),
-            }),
-            x if *x == atoms::i64() => values.push(SVal {
-                v: Val::I64(param.decode()?),
-            }),
-            x if *x == atoms::f32() => {
-                let v: f32 = param.decode()?;
-                values.push(SVal {
-                    v: Val::F32(v.to_bits()),
-                })
-            }
-            x if *x == atoms::f64() => {
-                let v: f64 = param.decode()?;
-                values.push(SVal {
-                    v: Val::F64(v.to_bits()),
-                })
-            }
-            _ => (),
-        };
-    }
-    Ok(values)
-}
-
-fn params_ty_sval_vec(params: &Vec<Term>, tys: &Vec<ValType>) -> Result<Vec<SVal>, RustlerError> {
-    let mut values: Vec<SVal> = Vec::new();
-    for (param, ty) in params.iter().zip(tys) {
-        match ty {
-            ValType::I32 => values.push(SVal {
-                v: Val::I32(param.decode()?),
-            }),
-            ValType::I64 => values.push(SVal {
-                v: Val::I64(param.decode()?),
-            }),
-            ValType::F32 => {
-                let arg: f32 = param.decode()?;
-                values.push(SVal {
-                    v: Val::F32(arg.to_bits()),
-                })
-            }
-            ValType::F64 => {
-                let arg: f64 = param.decode()?;
-                values.push(SVal {
-                    v: Val::F64(arg.to_bits()),
-                })
-            }
-            _ => (),
-        };
-    }
-    Ok(values)
-}
-
-fn sval_vec_to_term<'a>(env: Env<'a>, params: Vec<SVal>) -> Term<'a> {
-    let mut res: Vec<Term> = Vec::new();
-    for param in params {
-        match param.v.ty() {
-            ValType::I32 => res.push(param.v.unwrap_i32().encode(env)),
-            ValType::I64 => res.push(param.v.unwrap_i64().encode(env)),
-            ValType::F32 => res.push(param.v.unwrap_f32().encode(env)),
-            ValType::F64 => res.push(param.v.unwrap_f64().encode(env)),
-            _ => (),
-        };
-    }
-    res.encode(env)
 }
