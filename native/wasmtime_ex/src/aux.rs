@@ -13,7 +13,7 @@ pub fn imports_valtype_to_extern(
     fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
     store: &Store,
 ) -> Vec<Extern> {
-    let mut _func_imports: Vec<Extern> = Vec::new();
+    let mut _func_imports: Vec<Extern> = Vec::with_capacity(fn_imports.len());
     for (_, func_params, func_results) in fn_imports {
         let fun: Extern = Func::new(
             &store,
@@ -136,7 +136,7 @@ fn func_param_tys(tid: i64, func_name: String) -> Result<Vec<ValType>, Box<dyn E
     }
 }
 
-pub fn fn_imports_and_exports_tys(
+pub fn imports_with_exports_tys(
     tid: i64,
     func_name: String,
     func_imports: &Vec<(i64, Vec<Atom>, Vec<Atom>)>,

@@ -134,7 +134,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
         Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
     };
 
-    let fn_imports = match aux::imports_term_to_valtype(&func_imports) {
+    let func_imports = match aux::imports_term_to_valtype(&func_imports) {
         Ok(v) => v,
         Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
     };
@@ -146,7 +146,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             from_encoded: &String,
             array: &[u8],
             file_name: String,
-            fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
+            func_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
             config: &config::Config,
         ) -> Result<(), Box<dyn Error>> {
             let config = match aux::gen_config(config) {
@@ -170,8 +170,8 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             };
 
             let store = Store::new(module.engine());
-            let func_ids: Vec<i64> = fn_imports.iter().map(|x| x.0).collect();
-            let func_imports = aux::imports_valtype_to_extern(fn_imports, &store);
+            let func_ids: Vec<i64> = func_imports.iter().map(|x| x.0).collect();
+            let func_imports = aux::imports_valtype_to_extern(func_imports, &store);
 
             let instance = match Instance::new(&store, &module, &*func_imports.into_boxed_slice()) {
                 Ok(v) => v,
@@ -217,7 +217,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             &from_encoded,
             &bin,
             file_name,
-            fn_imports,
+            func_imports,
             &config,
         ) {
             Ok(_) => (),
@@ -245,8 +245,8 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     let params: Vec<Term> = args[4].decode()?;
     let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[5].decode()?;
 
-    let (fn_imports, tys) =
-        match aux::fn_imports_and_exports_tys(tid, func_name.clone(), &func_imports) {
+    let (func_imports, tys) =
+        match aux::imports_with_exports_tys(tid, func_name.clone(), &func_imports) {
             Ok(v) => v,
             Err(e) => {
                 env.send(
@@ -269,13 +269,13 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             gen_pid: &Pid,
             from_encoded: &String,
             func_name: String,
-            fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
+            func_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
             svals: Vec<SVal>,
         ) -> Result<(), Box<dyn Error>> {
             if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
                 let store = Store::new(session.module.engine());
                 let func_imports = aux::imports_valtype_to_extern_recv(
-                    fn_imports,
+                    func_imports,
                     &store,
                     &session.fchs,
                     &gen_pid.clone(),
@@ -334,7 +334,7 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             &gen_pid,
             &from_encoded,
             func_name.to_string(),
-            fn_imports,
+            func_imports,
             svals,
         ) {
             Ok(_) => (),
@@ -361,16 +361,16 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
-        let fn_imports = match aux::imports_term_to_valtype(&func_imports) {
+        let func_imports = match aux::imports_term_to_valtype(&func_imports) {
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         };
-        let fn_imports = aux::imports_valtype_to_extern(fn_imports, &store);
-        let instance = match Instance::new(&store, &session.module, &*fn_imports.into_boxed_slice())
-        {
-            Ok(v) => v,
-            Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
-        };
+        let func_imports = aux::imports_valtype_to_extern(func_imports, &store);
+        let instance =
+            match Instance::new(&store, &session.module, &*func_imports.into_boxed_slice()) {
+                Ok(v) => v,
+                Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+            };
         match instance.get_func(&func_name) {
             Some(f) => {
                 let mut params: Vec<Term> = Vec::new();
@@ -426,16 +426,16 @@ fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
-        let fn_imports = match aux::imports_term_to_valtype(&func_imports) {
+        let func_imports = match aux::imports_term_to_valtype(&func_imports) {
             Ok(v) => v,
             Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
         };
-        let fn_imports = aux::imports_valtype_to_extern(fn_imports, &store);
-        let instance = match Instance::new(&store, &session.module, &*fn_imports.into_boxed_slice())
-        {
-            Ok(v) => v,
-            Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
-        };
+        let func_imports = aux::imports_valtype_to_extern(func_imports, &store);
+        let instance =
+            match Instance::new(&store, &session.module, &*func_imports.into_boxed_slice()) {
+                Ok(v) => v,
+                Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+            };
 
         let mut _exports: Vec<(&str, Term)> = Vec::new();
         for v in instance.exports() {
