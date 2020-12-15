@@ -71,9 +71,15 @@ This next example loads a Wasm module from this [rust lib.rs file](./test/data/w
 
 If you want to see more usage examples, check [this test file](./test/wasmtime_test.exs) out.
 
+## Supported Wasm types
+
+- Functions are supported with the four value types `i32`, `i64`, `f32` and `f64`
+- Memory will be supported soon
+- Globals and Tables are will be considered in the future
+
 ## Benchmark
 
-Wasmtime is really fast. Here's a benchmark with [these simple functions](./test/bench/bench.exs), running on my computer, for a reference:
+Wasmtime is fast. Here's a benchmark with [these simple functions](./test/bench/bench.exs), running on my computer, for a reference:
 
 ```
 Compiling NIF crate :wasmtime_ex (native/wasmtime_ex)...
@@ -100,9 +106,3 @@ add              21.75 K       45.98 μs    ±52.83%       42.90 μs       83.64
 plus_10          19.78 K       50.55 μs    ±47.20%       46.26 μs       91.51 μs
 imports           4.28 K      233.76 μs    ±20.80%      230.13 μs      332.01 μs
 ```
-
-## Supported Wasm types
-
-- Functions are supported with the four value types `i32`, `i64`, `f32` and `f64`
-- Memory will be supported soon
-- Globals and Tables are will be considered in the future
