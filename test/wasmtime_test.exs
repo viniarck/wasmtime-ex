@@ -264,12 +264,15 @@ defmodule WasmtimeTest do
         (i32.store8 (local.get 0) (local.get 1))
       )
 
-      (data (i32.const 0x1000) "\01\02\03\04")
+      (data (i32.const 0x1000) "\01\02\03\05")
     )
     /
     {:ok, pid} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
 
     {:ok, [{"memory", :memory}, {"size", :func}, {"load", :func}, {"store", :func}]} =
       Wasmtime.exports(pid)
+
+    {:ok, [1]} = Wasmtime.call_func(pid, "load", [0x1000])
+    {:ok, [5]} = Wasmtime.call_func(pid, "load", [0x1003])
   end
 end
