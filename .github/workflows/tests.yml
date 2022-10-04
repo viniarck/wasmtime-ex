@@ -6,8 +6,8 @@ jobs:
     name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
     strategy:
       matrix:
-        otp: ['23.1', '23.0']
-        elixir: ['1.11.0', '1.10.0']
+        otp: ['25.0']
+        elixir: ['1.13.4']
     env:
       MIX_ENV: test
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -17,6 +17,7 @@ jobs:
         with:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
+          experimental-otp: true
       - run: mix deps.get
       - run: mix test
       # - run: mix coveralls --trace
