@@ -4,7 +4,7 @@ use crate::session::SESSIONS;
 
 use crate::session::SVal;
 use rustler::Error as RustlerError;
-use rustler::{Atom, Encoder, Env, OwnedEnv, Pid, Term};
+use rustler::{Atom, Encoder, Env, OwnedEnv, LocalPid, Term};
 use std::collections::HashMap;
 use std::error::Error;
 use wasmtime::*;
@@ -75,7 +75,7 @@ pub fn imports_valtype_to_extern_recv(
     fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
     store: &Store,
     fchs: &HashMap<i64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>,
-    gen_pid: &Pid,
+    gen_pid: &LocalPid
 ) -> Vec<Extern> {
     let mut _func_imports: Vec<Extern> = Vec::with_capacity(fn_imports.len());
     for (func_id, func_params, func_results) in fn_imports {

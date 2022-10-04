@@ -10,7 +10,7 @@ path = "src/lib.rs"
 crate-type = ["dylib"]
 
 [dependencies]
-rustler = "0.21.1"
+rustler = "0.26.0"
 serde = "1.0.118"
 serde_json = "1.0"
 lazy_static = "1.0"

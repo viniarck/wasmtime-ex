@@ -43,7 +43,7 @@ defmodule Wasmtime.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:rustler, "~> 0.21.1"},
+      {:rustler, "~> 0.26.0"},
       {:jason, "~> 1.2.2"},
       {:excoveralls, "~> 0.13.2", only: :test},
       {:ex_doc, "~> 0.23", only: :dev, runtime: false},
