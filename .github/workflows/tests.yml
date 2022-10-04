@@ -19,5 +19,6 @@ jobs:
           elixir-version: ${{matrix.elixir}}
           experimental-otp: true
       - run: mix deps.get
-      - run: mix coveralls --trace
-      - run: mix coveralls.github
+      - run: mix test
+      # - run: mix coveralls --trace
+      # - run: mix coveralls.github

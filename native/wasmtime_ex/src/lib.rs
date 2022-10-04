@@ -5,7 +5,7 @@ pub mod session;
 
 use rustler::schedule::SchedulerFlags;
 use rustler::Error as RustlerError;
-use rustler::{Atom, Encoder, Env, OwnedEnv, Pid, Term};
+use rustler::{Atom, Encoder, Env, OwnedEnv, LocalPid, Term};
 
 use crate::session::{SVal, SValType, Session, SESSIONS};
 use crossbeam::channel::unbounded;
@@ -122,7 +122,7 @@ fn exfn_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerEr
 
 fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: i64 = args[0].decode()?;
-    let gen_pid: Pid = args[1].decode()?;
+    let gen_pid: LocalPid = args[1].decode()?;
     let from_encoded: String = args[2].decode()?;
     let file_name: String = args[3].decode()?;
     let bin: Vec<u8> = args[4].decode()?;
@@ -142,7 +142,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     thread::spawn(move || {
         fn run(
             tid: i64,
-            gen_pid: &Pid,
+            gen_pid: &LocalPid,
             from_encoded: &String,
             array: &[u8],
             file_name: String,
@@ -239,7 +239,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
 
 fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: i64 = args[0].decode()?;
-    let gen_pid: Pid = args[1].decode()?;
+    let gen_pid: LocalPid = args[1].decode()?;
     let from_encoded: String = args[2].decode()?;
     let func_name: String = args[3].decode()?;
     let params: Vec<Term> = args[4].decode()?;
@@ -266,7 +266,7 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     thread::spawn(move || {
         fn run(
             tid: i64,
-            gen_pid: &Pid,
+            gen_pid: &LocalPid,
             from_encoded: &String,
             func_name: String,
             func_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
