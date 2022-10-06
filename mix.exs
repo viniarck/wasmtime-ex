@@ -7,12 +7,7 @@ defmodule Wasmtime.MixProject do
       version: "0.2.0",
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
-      compilers: [:rustler] ++ Mix.compilers(),
-      rustler_crates: [
-        wasmtime_ex: [
-          mode: if(Mix.env() == :prod, do: :release, else: :debug)
-        ]
-      ],
+      compilers: Mix.compilers(),
       name: "Wasmtime",
       description: "Elixir WebAssembly runtime powered by Wasmtime",
       package: package(),
