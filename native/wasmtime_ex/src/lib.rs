@@ -3,9 +3,8 @@ pub mod aux;
 pub mod config;
 pub mod session;
 
-use rustler::schedule::SchedulerFlags;
 use rustler::Error as RustlerError;
-use rustler::{Atom, Encoder, Env, OwnedEnv, LocalPid, Term};
+use rustler::{Atom, Encoder, Env, LocalPid, OwnedEnv, Term};
 
 use crate::session::{SVal, SValType, Session, SESSIONS};
 use crossbeam::channel::unbounded;
@@ -15,26 +14,25 @@ use std::thread;
 use wasmtime::Val;
 use wasmtime::*;
 
-rustler::rustler_export_nifs! {
+rustler::init!(
     "Elixir.Wasmtime.Native",
     [
+        load_from,
+        call_func,
+        call_func_xt,
+        get_func,
+        exfn_reply,
+        exports
+    ]
+);
 
-        ("load_from", 7, load_from),
-        ("call_func", 6, call_func, SchedulerFlags::DirtyCpu),
-        ("call_func_xt", 3, call_func_xt, SchedulerFlags::DirtyCpu),
-        ("get_func", 3, get_func),
-        ("exfn_reply", 3, exfn_reply, SchedulerFlags::DirtyCpu),
-        ("exports", 2, exports),
-    ],
-    None
-}
-
-
-fn call_func_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
-    let tid: i64 = args[0].decode()?;
-    let func_name: String = args[1].decode()?;
-    let params: Vec<Term> = args[2].decode()?;
-
+#[rustler::nif(schedule = "DirtyCpu")]
+fn call_func_xt<'a>(
+    env: Env<'a>,
+    tid: i64,
+    func_name: String,
+    params: Vec<Term<'a>>,
+) -> Result<Term<'a>, RustlerError> {
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
         let instance = match Instance::new(&store, &session.module, &[]) {
@@ -97,17 +95,20 @@ fn call_func_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Rustler
     }
 }
 
-fn exfn_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
-    let tid: i64 = args[0].decode()?;
-    let func_id: i64 = args[1].decode()?;
-    let results: Vec<(Term, Atom)> = args[2].decode()?;
+#[rustler::nif(schedule = "DirtyCpu")]
+fn exfn_reply<'a>(
+    env: Env<'a>,
+    tid: i64,
+    func_id: i64,
+    results: Vec<(Term, Atom)>,
+) -> Result<Term<'a>, RustlerError> {
     let results = aux::args_to_svals(results)?;
 
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         if let Some(fch) = session.fchs.get(&func_id) {
             match fch.0.send(results) {
                 Ok(_) => Ok((atom::ok()).encode(env)),
-                Err(_) => Ok((atom::error(), "exfn_reply failed to send").encode(env))
+                Err(_) => Ok((atom::error(), "exfn_reply failed to send").encode(env)),
             }
         } else {
             Ok((atom::error(), "exfn_reply failed to get func_id").encode(env))
@@ -121,15 +122,17 @@ fn exfn_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerEr
     }
 }
 
-fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
-    let tid: i64 = args[0].decode()?;
-    let gen_pid: LocalPid = args[1].decode()?;
-    let from_encoded: String = args[2].decode()?;
-    let file_name: String = args[3].decode()?;
-    let bin: Vec<u8> = args[4].decode()?;
-    let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[5].decode()?;
-    let config_val: String = args[6].decode()?;
-
+#[rustler::nif]
+fn load_from<'a>(
+    env: Env<'a>,
+    tid: i64,
+    gen_pid: LocalPid,
+    from_encoded: String,
+    file_name: String,
+    bin: Vec<u8>,
+    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>,
+    config_val: String,
+) -> Result<Term<'a>, RustlerError> {
     let config: config::Config = match serde_json::from_str(&config_val) {
         Ok(v) => v,
         Err(e) => return Ok((atom::error(), e.to_string()).encode(env)),
@@ -179,7 +182,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                 Err(e) => return Err(e.into()),
             };
 
-            let mut exports: HashMap<String, Vec<SValType>> = HashMap::new();
+            let mut _exports: HashMap<String, Vec<SValType>> = HashMap::new();
             for v in instance.exports() {
                 match v.ty() {
                     ExternType::Func(t) => {
@@ -187,7 +190,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                         for param in t.params() {
                             params.push(SValType { ty: param.clone() });
                         }
-                        exports.insert(v.name().to_string(), params);
+                        _exports.insert(v.name().to_string(), params);
                     }
                     _ => (),
                 }
@@ -203,7 +206,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                 fchs.insert(func_id, fch);
             }
 
-            let session = Box::new(Session::new(module, fchs, exports));
+            let session = Box::new(Session::new(module, fchs, _exports));
             SESSIONS.write().unwrap().insert(tid, session);
 
             msg_env.send_and_clear(gen_pid, |env| {
@@ -228,7 +231,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                     (
                         atom::gen_reply(),
                         from_encoded,
-                        (atom::error(), e.to_string())
+                        (atom::error(), e.to_string()),
                     )
                         .encode(env)
                 });
@@ -238,14 +241,16 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     Ok((atom::ok()).encode(env))
 }
 
-fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
-    let tid: i64 = args[0].decode()?;
-    let gen_pid: LocalPid = args[1].decode()?;
-    let from_encoded: String = args[2].decode()?;
-    let func_name: String = args[3].decode()?;
-    let params: Vec<Term> = args[4].decode()?;
-    let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[5].decode()?;
-
+#[rustler::nif(schedule = "DirtyCpu")]
+fn call_func<'a>(
+    env: Env<'a>,
+    tid: i64,
+    gen_pid: LocalPid,
+    from_encoded: String,
+    func_name: String,
+    params: Vec<Term>,
+    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>,
+) -> Result<Term<'a>, RustlerError> {
     let (func_imports, tys) =
         match aux::imports_with_exports_tys(tid, func_name.clone(), &func_imports) {
             Ok(v) => v,
@@ -255,7 +260,7 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                     (
                         atom::gen_reply(),
                         from_encoded,
-                        (atom::error(), e.to_string())
+                        (atom::error(), e.to_string()),
                     )
                         .encode(env),
                 );
@@ -355,11 +360,13 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
     Ok((atom::ok()).encode(env))
 }
 
-fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
-    let tid: i64 = args[0].decode()?;
-    let func_name: String = args[1].decode()?;
-    let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[2].decode()?;
-
+#[rustler::nif]
+fn get_func<'a>(
+    env: Env<'a>,
+    tid: i64,
+    func_name: String,
+    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>,
+) -> Result<Term<'a>, RustlerError> {
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
         let func_imports = match aux::imports_term_to_valtype(&func_imports) {
@@ -421,10 +428,12 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
     }
 }
 
-fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
-    let tid: i64 = args[0].decode()?;
-    let func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)> = args[1].decode()?;
-
+#[rustler::nif]
+fn exports<'a>(
+    env: Env<'a>,
+    tid: i64,
+    func_imports: Vec<(i64, Vec<Atom>, Vec<Atom>)>,
+) -> Result<Term<'a>, RustlerError> {
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         let store = Store::new(session.module.engine());
         let func_imports = match aux::imports_term_to_valtype(&func_imports) {
