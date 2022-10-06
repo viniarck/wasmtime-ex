@@ -75,7 +75,7 @@ If you want to see more usage examples, check [this test file](./test/wasmtime_t
 
 - Functions are supported with the four value types `i32`, `i64`, `f32` and `f64`
 - Memory will be supported soon
-- Globals and Tables are will be considered in the future
+- Globals and Tables will be considered in the future
 
 ## Benchmark
 
