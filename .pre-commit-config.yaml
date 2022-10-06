@@ -2,6 +2,7 @@
 # Init with
 # $ pip install pre-commit
 # $ pre-commit install
+repos:
 - repo: local
   hooks:
 
