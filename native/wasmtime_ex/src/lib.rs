@@ -1,4 +1,4 @@
-pub mod atoms;
+pub mod atom;
 pub mod aux;
 pub mod config;
 pub mod session;
@@ -29,6 +29,7 @@ rustler::rustler_export_nifs! {
     None
 }
 
+
 fn call_func_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
     let tid: i64 = args[0].decode()?;
     let func_name: String = args[1].decode()?;
@@ -38,7 +39,7 @@ fn call_func_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Rustler
         let store = Store::new(session.module.engine());
         let instance = match Instance::new(&store, &session.module, &[]) {
             Ok(v) => v,
-            Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+            Err(e) => return Ok((atom::error(), e.to_string()).encode(env)),
         };
 
         match instance.get_func(&func_name) {
@@ -54,7 +55,7 @@ fn call_func_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Rustler
                 let call_res = match f.call(&args) {
                     Ok(v) => v,
                     Err(e) => {
-                        return Ok((atoms::error(), e.to_string()).encode(env));
+                        return Ok((atom::error(), e.to_string()).encode(env));
                     }
                 };
 
@@ -77,11 +78,11 @@ fn call_func_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Rustler
                     };
                 }
 
-                return Ok((atoms::ok(), results).encode(env));
+                return Ok((atom::ok(), results).encode(env));
             }
             None => {
                 return Ok((
-                    atoms::error(),
+                    atom::error(),
                     std::format!("function {:?} not found", func_name),
                 )
                     .encode(env))
@@ -89,7 +90,7 @@ fn call_func_xt<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Rustler
         };
     } else {
         Ok((
-            atoms::error(),
+            atom::error(),
             "Wasmtime.load(payload) hasn't been called yet",
         )
             .encode(env))
@@ -105,15 +106,15 @@ fn exfn_reply<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerEr
     if let Some(session) = SESSIONS.read().unwrap().get(&tid) {
         if let Some(fch) = session.fchs.get(&func_id) {
             match fch.0.send(results) {
-                Ok(_) => Ok((atoms::ok()).encode(env)),
-                Err(_) => Ok((atoms::error(), "exfn_reply failed to send").encode(env)),
+                Ok(_) => Ok((atom::ok()).encode(env)),
+                Err(_) => Ok((atom::error(), "exfn_reply failed to send").encode(env))
             }
         } else {
-            Ok((atoms::error(), "exfn_reply failed to get func_id").encode(env))
+            Ok((atom::error(), "exfn_reply failed to get func_id").encode(env))
         }
     } else {
         Ok((
-            atoms::error(),
+            atom::error(),
             "Wasmtime.load(payload) hasn't been called yet",
         )
             .encode(env))
@@ -131,12 +132,12 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
 
     let config: config::Config = match serde_json::from_str(&config_val) {
         Ok(v) => v,
-        Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+        Err(e) => return Ok((atom::error(), e.to_string()).encode(env)),
     };
 
     let func_imports = match aux::imports_term_to_valtype(&func_imports) {
         Ok(v) => v,
-        Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+        Err(e) => return Ok((atom::error(), e.to_string()).encode(env)),
     };
 
     thread::spawn(move || {
@@ -206,7 +207,7 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
             SESSIONS.write().unwrap().insert(tid, session);
 
             msg_env.send_and_clear(gen_pid, |env| {
-                (atoms::gen_reply(), from_encoded, atoms::ok()).encode(env)
+                (atom::gen_reply(), from_encoded, atom::ok()).encode(env)
             });
             Ok(())
         }
@@ -225,16 +226,16 @@ fn load_from<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                 let mut msg_env = OwnedEnv::new();
                 msg_env.send_and_clear(&gen_pid, |env| {
                     (
-                        atoms::gen_reply(),
+                        atom::gen_reply(),
                         from_encoded,
-                        (atoms::error(), e.to_string()),
+                        (atom::error(), e.to_string())
                     )
                         .encode(env)
                 });
             }
         };
     });
-    Ok((atoms::ok()).encode(env))
+    Ok((atom::ok()).encode(env))
 }
 
 fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
@@ -252,13 +253,13 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                 env.send(
                     &gen_pid,
                     (
-                        atoms::gen_reply(),
+                        atom::gen_reply(),
                         from_encoded,
-                        (atoms::error(), e.to_string()),
+                        (atom::error(), e.to_string())
                     )
                         .encode(env),
                 );
-                return Ok((atoms::ok()).encode(env));
+                return Ok((atom::ok()).encode(env));
             }
         };
     let svals = aux::args_ty_to_svals(&params, &tys)?;
@@ -298,7 +299,7 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                     let call_res = match func.call(&params) {
                         Ok(v) => v,
                         Err(e) => {
-                            return (atoms::gen_reply(), from_encoded, e.to_string()).encode(env)
+                            return (atom::gen_reply(), from_encoded, e.to_string()).encode(env)
                         }
                     };
 
@@ -321,7 +322,7 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                         };
                     }
 
-                    (atoms::gen_reply(), from_encoded, (atoms::ok(), results)).encode(env)
+                    (atom::gen_reply(), from_encoded, (atom::ok(), results)).encode(env)
                 });
                 Ok(())
             } else {
@@ -342,16 +343,16 @@ fn call_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErr
                 let mut msg_env = OwnedEnv::new();
                 msg_env.send_and_clear(&gen_pid, |env| {
                     (
-                        atoms::gen_reply(),
+                        atom::gen_reply(),
                         from_encoded,
-                        (atoms::error(), e.to_string()),
+                        (atom::error(), e.to_string()),
                     )
                         .encode(env)
                 });
             }
         };
     });
-    Ok((atoms::ok()).encode(env))
+    Ok((atom::ok()).encode(env))
 }
 
 fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError> {
@@ -363,13 +364,13 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
         let store = Store::new(session.module.engine());
         let func_imports = match aux::imports_term_to_valtype(&func_imports) {
             Ok(v) => v,
-            Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+            Err(e) => return Ok((atom::error(), e.to_string()).encode(env)),
         };
         let func_imports = aux::imports_valtype_to_extern(func_imports, &store);
         let instance =
             match Instance::new(&store, &session.module, &*func_imports.into_boxed_slice()) {
                 Ok(v) => v,
-                Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+                Err(e) => return Ok((atom::error(), e.to_string()).encode(env)),
             };
         match instance.get_func(&func_name) {
             Some(f) => {
@@ -377,35 +378,35 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
                 let mut results: Vec<Term> = Vec::new();
                 for v in f.ty().params() {
                     match v {
-                        ValType::I32 => params.push((atoms::i32()).encode(env)),
-                        ValType::I64 => params.push((atoms::i64()).encode(env)),
-                        ValType::F32 => params.push((atoms::f32()).encode(env)),
-                        ValType::F64 => params.push((atoms::f64()).encode(env)),
-                        ValType::V128 => params.push((atoms::v128()).encode(env)),
-                        ValType::ExternRef => params.push((atoms::extern_ref()).encode(env)),
-                        ValType::FuncRef => params.push((atoms::func_ref()).encode(env)),
+                        ValType::I32 => params.push((atom::i32()).encode(env)),
+                        ValType::I64 => params.push((atom::i64()).encode(env)),
+                        ValType::F32 => params.push((atom::f32()).encode(env)),
+                        ValType::F64 => params.push((atom::f64()).encode(env)),
+                        ValType::V128 => params.push((atom::v128()).encode(env)),
+                        ValType::ExternRef => params.push((atom::extern_ref()).encode(env)),
+                        ValType::FuncRef => params.push((atom::func_ref()).encode(env)),
                     };
                 }
                 for v in f.ty().results() {
                     match v {
-                        ValType::I32 => results.push((atoms::i32()).encode(env)),
-                        ValType::I64 => results.push((atoms::i64()).encode(env)),
-                        ValType::F32 => results.push((atoms::f32()).encode(env)),
-                        ValType::F64 => results.push((atoms::f64()).encode(env)),
+                        ValType::I32 => results.push((atom::i32()).encode(env)),
+                        ValType::I64 => results.push((atom::i64()).encode(env)),
+                        ValType::F32 => results.push((atom::f32()).encode(env)),
+                        ValType::F64 => results.push((atom::f64()).encode(env)),
                         t => {
                             return Ok((
-                                atoms::error(),
+                                atom::error(),
                                 std::format!("ValType not supported yet: {:?}", t),
                             )
                                 .encode(env))
                         }
                     };
                 }
-                return Ok((atoms::ok(), (params, results)).encode(env));
+                return Ok((atom::ok(), (params, results)).encode(env));
             }
             None => {
                 return Ok((
-                    atoms::error(),
+                    atom::error(),
                     std::format!("function {:?} not found", func_name),
                 )
                     .encode(env))
@@ -413,7 +414,7 @@ fn get_func<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerErro
         };
     } else {
         Ok((
-            atoms::error(),
+            atom::error(),
             "Wasmtime.load(payload) hasn't been called yet",
         )
             .encode(env))
@@ -428,36 +429,36 @@ fn exports<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, RustlerError
         let store = Store::new(session.module.engine());
         let func_imports = match aux::imports_term_to_valtype(&func_imports) {
             Ok(v) => v,
-            Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+            Err(e) => return Ok((atom::error(), e.to_string()).encode(env)),
         };
         let func_imports = aux::imports_valtype_to_extern(func_imports, &store);
         let instance =
             match Instance::new(&store, &session.module, &*func_imports.into_boxed_slice()) {
                 Ok(v) => v,
-                Err(e) => return Ok((atoms::error(), e.to_string()).encode(env)),
+                Err(e) => return Ok((atom::error(), e.to_string()).encode(env)),
             };
 
         let mut _exports: Vec<(&str, Term)> = Vec::new();
         for v in instance.exports() {
             match v.ty() {
                 ExternType::Func(_) => {
-                    _exports.push((v.name(), atoms::func().encode(env)));
+                    _exports.push((v.name(), atom::func().encode(env)));
                 }
                 ExternType::Global(_) => {
-                    _exports.push((v.name(), atoms::global().encode(env)));
+                    _exports.push((v.name(), atom::global().encode(env)));
                 }
                 ExternType::Table(_) => {
-                    _exports.push((v.name(), atoms::table().encode(env)));
+                    _exports.push((v.name(), atom::table().encode(env)));
                 }
                 ExternType::Memory(_) => {
-                    _exports.push((v.name(), atoms::memory().encode(env)));
+                    _exports.push((v.name(), atom::memory().encode(env)));
                 }
             };
         }
-        Ok((atoms::ok(), _exports).encode(env))
+        Ok((atom::ok(), _exports).encode(env))
     } else {
         Ok((
-            atoms::error(),
+            atom::error(),
             "Wasmtime.load(payload) hasn't been called yet",
         )
             .encode(env))

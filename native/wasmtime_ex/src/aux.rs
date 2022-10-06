@@ -1,4 +1,4 @@
-use crate::atoms;
+use crate::atom;
 use crate::config;
 use crate::session::SESSIONS;
 
@@ -36,19 +36,19 @@ pub fn imports_term_to_valtype(
         let mut res: Vec<ValType> = Vec::new();
         for p in params {
             match p {
-                x if *x == atoms::i32() => par.push(ValType::I32),
-                x if *x == atoms::i64() => par.push(ValType::I64),
-                x if *x == atoms::f32() => par.push(ValType::F32),
-                x if *x == atoms::f64() => par.push(ValType::F64),
+                x if *x == atom::i32() => par.push(ValType::I32),
+                x if *x == atom::i64() => par.push(ValType::I64),
+                x if *x == atom::f32() => par.push(ValType::F32),
+                x if *x == atom::f64() => par.push(ValType::F64),
                 x => return Err(std::format!("ValType not supported yet: {:?}", x).into()),
             }
         }
         for r in results {
             match r {
-                x if *x == atoms::i32() => res.push(ValType::I32),
-                x if *x == atoms::i64() => res.push(ValType::I64),
-                x if *x == atoms::f32() => res.push(ValType::F32),
-                x if *x == atoms::f64() => res.push(ValType::F64),
+                x if *x == atom::i32() => res.push(ValType::I32),
+                x if *x == atom::i64() => res.push(ValType::I64),
+                x if *x == atom::f32() => res.push(ValType::F32),
+                x if *x == atom::f64() => res.push(ValType::F64),
                 x => return Err(std::format!("ValType not supported yet: {:?}", x).into()),
             }
         }
@@ -99,7 +99,7 @@ pub fn imports_valtype_to_extern_recv(
                         }
                         let mut msg_env = OwnedEnv::new();
                         msg_env.send_and_clear(&pid, |env| {
-                            (atoms::call_exfn(), func_id, sval_vec_to_term(env, values)).encode(env)
+                            (atom::call_exfn(), func_id, sval_vec_to_term(env, values)).encode(env)
                         });
                         for (i, result) in recv.recv().unwrap().iter().enumerate() {
                             _results[i] = result.v.clone();
@@ -191,19 +191,19 @@ pub fn args_to_svals(args: Vec<(Term, Atom)>) -> Result<Vec<SVal>, RustlerError>
     let mut values: Vec<SVal> = Vec::new();
     for (arg, ty) in args.iter() {
         match ty {
-            x if *x == atoms::i32() => values.push(SVal {
+            x if *x == atom::i32() => values.push(SVal {
                 v: Val::I32(arg.decode()?),
             }),
-            x if *x == atoms::i64() => values.push(SVal {
+            x if *x == atom::i64() => values.push(SVal {
                 v: Val::I64(arg.decode()?),
             }),
-            x if *x == atoms::f32() => {
+            x if *x == atom::f32() => {
                 let v: f32 = arg.decode()?;
                 values.push(SVal {
                     v: Val::F32(v.to_bits()),
                 })
             }
-            x if *x == atoms::f64() => {
+            x if *x == atom::f64() => {
                 let v: f64 = arg.decode()?;
                 values.push(SVal {
                     v: Val::F64(v.to_bits()),
