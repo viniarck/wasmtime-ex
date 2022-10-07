@@ -29,7 +29,7 @@ defmodule WasmtimeTest do
         i32.add)
     )
     /
-    {:error, "WebAssembly failed to compile"} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
+    {:error, _} = Wasmtime.load(%Wasmtime.FromBytes{bytes: mod})
   end
 
   test "load wat from bytes bad formatted" do
