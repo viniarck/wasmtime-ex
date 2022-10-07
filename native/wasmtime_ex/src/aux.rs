@@ -11,12 +11,13 @@ use wasmtime::*;
 
 pub fn imports_valtype_to_extern(
     fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
-    store: &Store,
+    store: &mut Store<()>
 ) -> Vec<Extern> {
     let mut _func_imports: Vec<Extern> = Vec::with_capacity(fn_imports.len());
+    let mut _store = store;
     for (_, func_params, func_results) in fn_imports {
         let fun: Extern = Func::new(
-            &store,
+            &mut _store,
             FuncType::new(func_params.into_iter(), func_results.into_iter()),
             move |_, _, _| Ok(()),
         )
@@ -73,18 +74,19 @@ fn sval_vec_to_term<'a>(env: Env<'a>, params: Vec<SVal>) -> Term<'a> {
 
 pub fn imports_valtype_to_extern_recv(
     fn_imports: Vec<(i64, Vec<ValType>, Vec<ValType>)>,
-    store: &Store,
+    store: &mut Store<()>,
     fchs: &HashMap<i64, (crossbeam::Sender<Vec<SVal>>, crossbeam::Receiver<Vec<SVal>>)>,
     gen_pid: &LocalPid
 ) -> Vec<Extern> {
     let mut _func_imports: Vec<Extern> = Vec::with_capacity(fn_imports.len());
+    let mut _store = store;
     for (func_id, func_params, func_results) in fn_imports {
         match fchs.get(&func_id) {
             Some(fch) => {
                 let pid = gen_pid.clone();
                 let recv = fch.1.clone();
                 let fun: Extern = Func::new(
-                    &store,
+                    &mut _store,
                     FuncType::new(func_params.into_iter(), func_results.into_iter()),
                     move |_, params, _results| {
                         let mut values: Vec<SVal> = Vec::new();
@@ -217,12 +219,10 @@ pub fn args_to_svals(args: Vec<(Term, Atom)>) -> Result<Vec<SVal>, RustlerError>
 
 pub fn gen_config(config: &config::Config) -> Result<Config, Box<dyn Error>> {
     let mut cfg = Config::new();
-    cfg.interruptable(config.interruptable);
     cfg.debug_info(config.debug_info);
     cfg.max_wasm_stack(config.max_wasm_stack);
     let strategy = match &config.strategy {
         x if x == "cranelift" => Strategy::Cranelift,
-        x if x == "lightbeam" => Strategy::Lightbeam,
         _ => Strategy::Auto,
     };
     let cranelift_opt_level = match &config.cranelift_opt_level {
@@ -231,9 +231,6 @@ pub fn gen_config(config: &config::Config) -> Result<Config, Box<dyn Error>> {
         _ => OptLevel::None,
     };
     cfg.cranelift_opt_level(cranelift_opt_level);
-    match cfg.strategy(strategy) {
-        Ok(_) => (),
-        Err(e) => return Err(e.into()),
-    };
+    cfg.strategy(strategy);
     Ok(cfg)
 }
