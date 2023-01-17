@@ -7,18 +7,37 @@ jobs:
     strategy:
       matrix:
         otp: ['25.0']
-        elixir: ['1.13.4']
+        elixir: ['1.14.0', '1.13.4']
     env:
       MIX_ENV: test
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-elixir@v1
-        with:
-          otp-version: ${{matrix.otp}}
-          elixir-version: ${{matrix.elixir}}
-          experimental-otp: true
-      - run: mix deps.get
-      - run: mix test
-      # - run: mix coveralls --trace
-      # - run: mix coveralls.github
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install libtinfo5
+      run: sudo apt-get install -y libtinfo5
+
+    - name: Setup Elixir
+      uses: actions/setup-elixir@v1
+      with:
+        elixir-version: ${{ matrix.elixir }}
+        otp-version: ${{ matrix.otp }}
+        experimental-otp: true
+
+    - name: Get deps cache
+      uses: actions/cache@v2
+      with:
+        path: deps/
+        key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+
+    - name: Install Dependencies
+      run: |
+        mix local.rebar --force
+        mix local.hex --force
+        mix deps.get
+        mix compile
+
+    - name: Run Tests
+      run: |
+        mix test
